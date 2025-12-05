@@ -1,0 +1,586 @@
+import { useState, useEffect } from 'react';
+import { docuwareService } from '../../services/docuwareService';
+import StatusConfig from './StatusConfig';
+import ColumnFilter from './ColumnFilter';
+import ColumnSelector from './ColumnSelector';
+
+const ResultsTable = ({ results, totalDocs, cabinetId }) => {
+    const [visibleColumns, setVisibleColumns] = useState({});
+    const [allColumns, setAllColumns] = useState([]);
+    const [statusConfig, setStatusConfig] = useState(null);
+    const [columnFilters, setColumnFilters] = useState({});
+    const [filteredResults, setFilteredResults] = useState([]);
+    const [sortColumn, setSortColumn] = useState(null);
+    const [sortDirection, setSortDirection] = useState('asc'); // 'asc' or 'desc'
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(25);
+
+    // Extract all unique columns from results
+    useEffect(() => {
+        if (results.length === 0) {
+            setAllColumns([]);
+            setVisibleColumns({});
+            setFilteredResults([]);
+            return;
+        }
+
+        const firstDoc = results[0];
+        const columns = [];
+
+        // Add standard columns
+        columns.push({ name: 'Id', label: 'Document ID', type: 'standard' });
+        columns.push({ name: 'Title', label: 'Title', type: 'standard' });
+        columns.push({ name: 'ContentType', label: 'Type', type: 'standard' });
+        columns.push({ name: 'FileSize', label: 'Size', type: 'standard' });
+        columns.push({ name: 'CreatedAt', label: 'Created At', type: 'standard' });
+        columns.push({ name: 'LastModified', label: 'Last Modified', type: 'standard' });
+
+        // Add custom fields from Fields array
+        if (firstDoc.Fields && Array.isArray(firstDoc.Fields)) {
+            firstDoc.Fields.forEach(field => {
+                if (!field.SystemField) {
+                    columns.push({
+                        name: field.FieldName,
+                        label: field.FieldLabel || field.FieldName,
+                        type: 'field'
+                    });
+                }
+            });
+        }
+
+        setAllColumns(columns);
+
+        // Set default visible columns (show first 6 columns by default)
+        const defaultVisible = {};
+        columns.slice(0, 6).forEach(col => {
+            defaultVisible[col.name] = true;
+        });
+        setVisibleColumns(defaultVisible);
+        setFilteredResults(results);
+    }, [results]);
+
+    // Apply column filters and sorting
+    useEffect(() => {
+        if (results.length === 0) {
+            setFilteredResults([]);
+            return;
+        }
+
+        let filtered = [...results];
+
+        // Apply each column filter
+        Object.keys(columnFilters).forEach(columnName => {
+            const selectedValues = columnFilters[columnName];
+            if (selectedValues && selectedValues.length > 0) {
+                filtered = filtered.filter(doc => {
+                    const column = allColumns.find(col => col.name === columnName);
+                    if (!column) return true;
+
+                    const cellValue = getFieldValue(doc, column);
+                    return selectedValues.includes(cellValue.toString());
+                });
+            }
+        });
+
+        // Apply sorting
+        if (sortColumn) {
+            filtered.sort((a, b) => {
+                const column = allColumns.find(col => col.name === sortColumn);
+                if (!column) return 0;
+
+                const aValue = getFieldValue(a, column);
+                const bValue = getFieldValue(b, column);
+
+                // Handle different types
+                let comparison = 0;
+                if (typeof aValue === 'number' && typeof bValue === 'number') {
+                    comparison = aValue - bValue;
+                } else {
+                    comparison = String(aValue).localeCompare(String(bValue));
+                }
+
+                return sortDirection === 'asc' ? comparison : -comparison;
+            });
+        }
+
+        setFilteredResults(filtered);
+    }, [columnFilters, results, allColumns, sortColumn, sortDirection]);
+
+    // Reset to page 1 when filters or sorting changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [columnFilters, sortColumn, sortDirection]);
+
+    // Get unique values for a column
+    const getUniqueValues = (column) => {
+        const values = new Set();
+        results.forEach(doc => {
+            const value = getFieldValue(doc, column);
+            values.add(value.toString());
+        });
+        return Array.from(values).sort();
+    };
+
+    const toggleFilterValue = (columnName, value) => {
+        setColumnFilters(prev => {
+            const current = prev[columnName] || [];
+            const newValues = current.includes(value)
+                ? current.filter(v => v !== value)
+                : [...current, value];
+
+            if (newValues.length === 0) {
+                const { [columnName]: _, ...rest } = prev;
+                return rest;
+            }
+
+            return { ...prev, [columnName]: newValues };
+        });
+    };
+
+    const selectAllValues = (columnName) => {
+        const column = allColumns.find(col => col.name === columnName);
+        if (!column) return;
+
+        const allValues = getUniqueValues(column);
+        setColumnFilters(prev => ({ ...prev, [columnName]: allValues }));
+    };
+
+    const clearColumnFilter = (columnName) => {
+        setColumnFilters(prev => {
+            const { [columnName]: _, ...rest } = prev;
+            return rest;
+        });
+    };
+
+    const clearAllFilters = () => {
+        setColumnFilters({});
+    };
+
+    const handleSort = (columnName) => {
+        if (sortColumn === columnName) {
+            // Toggle direction
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            // New column, start with ascending
+            setSortColumn(columnName);
+            setSortDirection('asc');
+        }
+    };
+
+    const toggleColumn = (columnName) => {
+        setVisibleColumns(prev => ({
+            ...prev,
+            [columnName]: !prev[columnName]
+        }));
+    };
+
+    const toggleAll = (show) => {
+        const newVisible = {};
+        allColumns.forEach(col => {
+            newVisible[col.name] = show;
+        });
+        setVisibleColumns(newVisible);
+    };
+
+    const formatDate = (value) => {
+        if (!value) return '-';
+
+        try {
+            let date;
+
+            if (typeof value === 'string') {
+                date = new Date(value);
+            } else if (typeof value === 'number') {
+                date = new Date(value);
+            } else {
+                return '-';
+            }
+
+            if (isNaN(date.getTime())) {
+                return '-';
+            }
+
+            return date.toLocaleString();
+        } catch (error) {
+            console.error('Date formatting error:', error);
+            return '-';
+        }
+    };
+
+    const formatFileSize = (bytes) => {
+        if (!bytes || bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    };
+
+    const getFieldValue = (doc, column) => {
+        if (column.type === 'standard') {
+            const value = doc[column.name];
+
+            if (column.name === 'FileSize') {
+                return formatFileSize(value);
+            }
+            if (column.name === 'CreatedAt' || column.name === 'LastModified') {
+                return formatDate(value);
+            }
+
+            return value || '-';
+        }
+
+        if (doc.Fields && Array.isArray(doc.Fields)) {
+            const field = doc.Fields.find(f => f.FieldName === column.name);
+            if (field) {
+                if (field.ItemElementName === 'Date' || field.FieldName.toLowerCase().includes('date')) {
+                    return formatDate(field.Item);
+                }
+                return field.Item || field.ItemElementName || '-';
+            }
+        }
+
+        return '-';
+    };
+
+    const getStatusColor = (doc) => {
+        if (!statusConfig) return null;
+
+        const fieldValue = getFieldValue(doc, { name: statusConfig.field, type: 'field' });
+        const rule = statusConfig.rules.find(r =>
+            r.value.toLowerCase() === fieldValue.toString().toLowerCase()
+        );
+
+        if (!rule) return null;
+
+        const colorMap = {
+            green: 'bg-green-500',
+            yellow: 'bg-yellow-500',
+            red: 'bg-red-500',
+            blue: 'bg-blue-500',
+            gray: 'bg-gray-500'
+        };
+
+        return colorMap[rule.color] || 'bg-gray-500';
+    };
+
+    const handleViewDocument = (docId) => {
+        if (!cabinetId) {
+            alert('Cabinet ID not available');
+            return;
+        }
+
+        const viewUrl = docuwareService.getDocumentViewUrl(cabinetId, docId);
+        window.open(viewUrl, '_blank');
+    };
+
+    const handleDownloadDocument = async (docId) => {
+        if (!cabinetId) {
+            alert('Cabinet ID not available');
+            return;
+        }
+
+        try {
+            const blob = await docuwareService.downloadDocument(cabinetId, docId);
+
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `document_${docId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Download error:', error);
+            alert('Failed to download document: ' + error.message);
+        }
+    };
+
+    if (results.length === 0) {
+        return (
+            <div className="card bg-base-100 shadow-xl">
+                <div className="card-body">
+                    <p className="text-center text-gray-500">No results found.</p>
+                </div>
+            </div>
+        );
+    }
+
+    const visibleCols = allColumns.filter(col => visibleColumns[col.name]);
+    const activeFiltersCount = Object.keys(columnFilters).length;
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredResults.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedResults = filteredResults.slice(startIndex, endIndex);
+
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+    };
+
+    const handleItemsPerPageChange = (value) => {
+        setItemsPerPage(value);
+        setCurrentPage(1);
+    };
+
+    const handleExportCSV = () => {
+        if (filteredResults.length === 0) return;
+
+        // Get headers from visible columns
+        const headers = visibleCols.map(col => col.name);
+
+        // Convert data to CSV format
+        const csvContent = [
+            headers.join(','), // Header row
+            ...filteredResults.map(row =>
+                visibleCols.map(col => {
+                    let value = row[col.name] || '';
+                    // Handle special characters and quotes
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+                        value = `"${value.replace(/"/g, '""')}"`;
+                    }
+                    return value;
+                }).join(',')
+            )
+        ].join('\n');
+
+        // Create download link
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `docuware_export_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    return (
+        <div className="card bg-base-100 shadow-xl">
+            <div className="card-body">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="card-title">
+                        Search Results ({filteredResults.length} of {results.length} documents)
+                        {activeFiltersCount > 0 && (
+                            <span className="badge badge-primary badge-sm">{activeFiltersCount} filters</span>
+                        )}
+                    </h2>
+
+                    <div className="dropdown dropdown-end">
+                        <div tabIndex={0} role="button" className="btn btn-sm btn-ghost">
+                            ⚙️ Options
+                        </div>
+                        <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
+                            <li>
+                                <a onClick={handleExportCSV}>
+                                    📥 Export CSV
+                                </a>
+                            </li>
+
+                            <ColumnSelector
+                                allColumns={allColumns}
+                                visibleColumns={visibleColumns}
+                                onToggleColumn={toggleColumn}
+                                onToggleAll={toggleAll}
+                                customTrigger={(onClick) => (
+                                    <li onClick={onClick}>
+                                        <a>⚙️ Columns</a>
+                                    </li>
+                                )}
+                            />
+
+                            <StatusConfig
+                                fields={allColumns}
+                                onConfigChange={setStatusConfig}
+                                customTrigger={(onClick) => (
+                                    <li onClick={onClick}>
+                                        <a>🚦 Status Indicator</a>
+                                    </li>
+                                )}
+                            />
+
+                            {activeFiltersCount > 0 && (
+                                <li>
+                                    <a onClick={clearAllFilters} className="text-error">
+                                        🗑️ Clear Filters
+                                    </a>
+                                </li>
+                            )}
+                        </ul>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra table-sm">
+                        <thead>
+                            <tr>
+                                {statusConfig && <th className="text-xs">Status</th>}
+                                {visibleCols.map(col => {
+                                    const hasFilter = columnFilters[col.name] && columnFilters[col.name].length > 0;
+                                    const uniqueValues = getUniqueValues(col);
+                                    const selectedValues = columnFilters[col.name] || [];
+
+                                    return (
+                                        <th key={col.name}>
+                                            <div className="flex items-center gap-1">
+                                                <span
+                                                    className="text-xs cursor-pointer hover:text-primary transition-colors select-none"
+                                                    onClick={() => handleSort(col.name)}
+                                                    title="Click to sort"
+                                                >
+                                                    {col.label}
+                                                    {sortColumn === col.name && (
+                                                        <span className="ml-1 text-primary">
+                                                            {sortDirection === 'asc' ? '▲' : '▼'}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                <ColumnFilter
+                                                    column={col}
+                                                    uniqueValues={uniqueValues}
+                                                    selectedValues={selectedValues}
+                                                    onToggleValue={toggleFilterValue}
+                                                    onSelectAll={selectAllValues}
+                                                    onClear={clearColumnFilter}
+                                                />
+                                            </div>
+                                        </th>
+                                    );
+                                })}
+                                <th className="text-xs">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {paginatedResults.map((doc, idx) => {
+                                const statusColor = getStatusColor(doc);
+                                return (
+                                    <tr key={doc.Id || idx}>
+                                        {statusConfig && (
+                                            <td>
+                                                <div className="flex justify-center">
+                                                    <div
+                                                        className={`w-4 h-4 rounded-full ${statusColor || 'bg-gray-300'}`}
+                                                        title={statusConfig ? getFieldValue(doc, { name: statusConfig.field, type: 'field' }) : ''}
+                                                    />
+                                                </div>
+                                            </td>
+                                        )}
+                                        {visibleCols.map(col => (
+                                            <td key={col.name}>{getFieldValue(doc, col)}</td>
+                                        ))}
+                                        <td>
+                                            <div className="flex gap-1">
+                                                <button
+                                                    className="btn btn-xs btn-primary"
+                                                    onClick={() => handleViewDocument(doc.Id)}
+                                                    title="View Document"
+                                                >
+                                                    👁️ View
+                                                </button>
+                                                <button
+                                                    className="btn btn-xs btn-secondary"
+                                                    onClick={() => handleDownloadDocument(doc.Id)}
+                                                    title="Download Document"
+                                                >
+                                                    ⬇️
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Pagination Controls */}
+                {filteredResults.length > 0 && (
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4 pt-4 border-t">
+                        {/* Info text */}
+                        <div className="text-sm text-base-content/70">
+                            Showing <span className="font-semibold text-base-content">{startIndex + 1}</span> to{' '}
+                            <span className="font-semibold text-base-content">{Math.min(endIndex, filteredResults.length)}</span> of{' '}
+                            <span className="font-semibold text-base-content">{filteredResults.length}</span> results
+                            {totalDocs > results.length && (
+                                <span className="ml-1 text-warning" title="Increase search limit to see more">
+                                    (fetched {results.length} of {totalDocs} available)
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            {/* Items per page */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-base-content/70">Per page:</span>
+                                <select
+                                    className="select select-bordered select-sm w-20"
+                                    value={itemsPerPage}
+                                    onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                </select>
+                            </div>
+
+                            {/* Page navigation */}
+                            {totalPages > 1 && (
+                                <div className="join">
+                                    <button
+                                        className="join-item btn btn-sm"
+                                        onClick={() => handlePageChange(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        title="Previous page"
+                                    >
+                                        ‹
+                                    </button>
+
+                                    <button className="join-item btn btn-sm btn-disabled pointer-events-none">
+                                        Page {currentPage} of {totalPages}
+                                    </button>
+
+                                    {/* Page numbers */}
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+
+                                        return (
+                                            <button
+                                                key={pageNum}
+                                                className={`join-item btn btn-sm ${currentPage === pageNum ? 'btn-active' : ''}`}
+                                                onClick={() => handlePageChange(pageNum)}
+                                            >
+                                                {pageNum}
+                                            </button>
+                                        );
+                                    })}
+
+                                    <button
+                                        className="join-item btn btn-sm"
+                                        onClick={() => handlePageChange(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        ›
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default ResultsTable;
