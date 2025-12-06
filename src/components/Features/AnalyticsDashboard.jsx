@@ -63,10 +63,11 @@ const AnalyticsDashboard = ({ cabinetId }) => {
         // Custom fields
         if (firstDoc.Fields && Array.isArray(firstDoc.Fields)) {
             firstDoc.Fields.forEach(field => {
-                if (!field.SystemField && field.DWFieldType !== 'Memo' && field.ItemElementName !== 'Date') {
+                // Allow DWDOCID specifically, or non-system fields
+                if (field.FieldName === 'DWDOCID' || (!field.SystemField && field.DWFieldType !== 'Memo' && field.ItemElementName !== 'Date')) {
                     fields.push({
                         name: field.FieldName,
-                        label: field.FieldLabel || field.FieldName
+                        label: field.FieldName === 'DWDOCID' ? 'ID do Documento' : (field.FieldLabel || field.FieldName)
                     });
                 }
             });
@@ -79,9 +80,10 @@ const AnalyticsDashboard = ({ cabinetId }) => {
 
         setAvailableFields(uniqueFields);
 
-        // Auto-select first field if nothing selected or current selection invalid
+        // Auto-select ContentType as default, otherwise first field
         if (!selectedField && uniqueFields.length > 0) {
-            setSelectedField(uniqueFields[0].name);
+            const fileTypeField = uniqueFields.find(f => f.name === 'ContentType');
+            setSelectedField(fileTypeField ? fileTypeField.name : uniqueFields[0].name);
         }
     }, [fullData, selectedField]);
 
