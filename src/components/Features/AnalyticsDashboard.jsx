@@ -1,33 +1,68 @@
 import { useState, useEffect, useMemo } from 'react';
-import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
+import { docuwareService } from '../../services/docuwareService';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1', '#a4de6c', '#d0ed57'];
 
-const AnalyticsDashboard = ({ results }) => {
+const AnalyticsDashboard = ({ cabinetId }) => {
     const [selectedField, setSelectedField] = useState('');
     const [availableFields, setAvailableFields] = useState([]);
+    const [fullData, setFullData] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [progress, setProgress] = useState({ current: 0, total: 0 });
 
-    // Extract available fields from results
+    // Fetch data when cabinetId changes
     useEffect(() => {
-        if (!results || results.length === 0) {
+        const fetchData = async () => {
+            if (!cabinetId) {
+                setFullData([]);
+                setAvailableFields([]);
+                setError(null);
+                return;
+            }
+
+            try {
+                setLoading(true);
+                setError(null);
+                setProgress({ current: 0, total: 0 });
+
+                const data = await docuwareService.getAllDocuments(cabinetId, (current, total) => {
+                    setProgress({ current, total });
+                });
+
+                setFullData(data);
+                if (data.length === 0) {
+                    setError("No documents found in this cabinet (0 items).");
+                }
+            } catch (err) {
+                console.error("Failed to load analytics data", err);
+                setError(err.message || "Failed to load analytics data.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [cabinetId]);
+
+    // Extract available fields from fullData
+    useEffect(() => {
+        if (!fullData || fullData.length === 0) {
             setAvailableFields([]);
             return;
         }
 
-        const firstDoc = results[0];
+        const firstDoc = fullData[0];
         const fields = [];
 
         // Standard fields
         fields.push({ name: 'ContentType', label: 'Content Type' });
-        // fields.push({ name: 'Author', label: 'Author' }); // Add if available
 
         // Custom fields
         if (firstDoc.Fields && Array.isArray(firstDoc.Fields)) {
             firstDoc.Fields.forEach(field => {
                 if (!field.SystemField && field.DWFieldType !== 'Memo' && field.ItemElementName !== 'Date') {
-                    // Exclude Dates and Memos for pie charts usually, but we can allow them if needed.
-                    // User specifically mentioned "Tipo de Documento", "Estatuto", "Categoria".
-                    // These are usually keyword/text fields.
                     fields.push({
                         name: field.FieldName,
                         label: field.FieldLabel || field.FieldName
@@ -46,7 +81,7 @@ const AnalyticsDashboard = ({ results }) => {
         if (!selectedField && uniqueFields.length > 0) {
             setSelectedField(uniqueFields[0].name);
         }
-    }, [results, selectedField]);
+    }, [fullData, selectedField]);
 
     const getFieldValue = (doc, fieldName) => {
         // Check standard first
@@ -62,41 +97,159 @@ const AnalyticsDashboard = ({ results }) => {
         return 'Unknown';
     };
 
-    // Process data for chart
-    const chartData = useMemo(() => {
-        if (!selectedField || results.length === 0) return [];
+    // Process data for charts
+    const { pieChartData, barChartData, timelineData, kpis } = useMemo(() => {
+        if (!fullData || fullData.length === 0) return { pieChartData: [], barChartData: [], timelineData: [], kpis: {} };
 
         const counts = {};
+        const dateCounts = {};
         let total = 0;
 
-        results.forEach(doc => {
+        fullData.forEach(doc => {
+            // Group by selected field
             const value = getFieldValue(doc, selectedField);
             const key = value ? String(value) : 'Empty';
             counts[key] = (counts[key] || 0) + 1;
             total++;
+
+            // Group by Date (DWStoreDateTime)
+            // Try standard system field or look in fields
+            // Group by Date (DWStoreDateTime)
+            // Try standard system field or look in fields case-insensitive
+            let dateStr = doc.DWStoreDateTime || doc.StoreDateTime;
+
+            // Helper for case-insensitive lookup
+            if (!dateStr) {
+                const findKey = (obj, key) => Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
+                const foundKey = findKey(doc, 'DWStoreDateTime');
+                if (foundKey) dateStr = doc[foundKey];
+            }
+
+            if (!dateStr && doc.Fields) {
+                const dateField = doc.Fields.find(f =>
+                    (f.DBName && f.DBName.toLowerCase() === 'dwstoredatetime') ||
+                    (f.FieldName && f.FieldName.toLowerCase() === 'dwstoredatetime')
+                );
+                if (dateField) dateStr = dateField.Item;
+            }
+
+            if (dateStr) {
+                try {
+                    let date;
+                    // Handle ASP.NET format
+                    if (typeof dateStr === 'string') {
+                        const msDateMatch = dateStr.match(/\/Date\((\d+)\)\//);
+                        if (msDateMatch) {
+                            date = new Date(parseInt(msDateMatch[1], 10));
+                        } else {
+                            date = new Date(dateStr);
+                        }
+                    } else {
+                        date = new Date(dateStr);
+                    }
+
+                    if (!isNaN(date.getTime())) {
+                        // Format: YYYY-MM
+                        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                        dateCounts[monthKey] = (dateCounts[monthKey] || 0) + 1;
+                    }
+                } catch (e) {
+                    // Ignore invalid dates
+                }
+            }
         });
 
-        return Object.keys(counts).map(key => ({
+        // Pie/Bar Data
+        const pieData = Object.keys(counts).map(key => ({
             name: key,
             value: counts[key],
             percent: (counts[key] / total) * 100
-        })).sort((a, b) => b.value - a.value); // Sort descending
+        })).sort((a, b) => b.value - a.value);
 
-    }, [results, selectedField]);
+        // Top 5 for Bar Chart
+        const barData = pieData.slice(0, 5);
 
+        // Timeline Data
+        const timeline = Object.keys(dateCounts).sort().map(key => ({
+            name: key,
+            count: dateCounts[key]
+        }));
 
-    if (!results || results.length === 0) {
-        return null; // hide if no results
+        const kpiData = {
+            totalDocs: total,
+            uniqueValues: Object.keys(counts).length,
+            topCategory: pieData.length > 0 ? pieData[0].name : 'N/A'
+        };
+
+        return { pieChartData: pieData, barChartData: barData, timelineData: timeline, kpis: kpiData };
+
+    }, [fullData, selectedField]);
+
+    if (loading) {
+        return (
+            <div className="card bg-base-100 shadow-xl mb-4">
+                <div className="card-body flex flex-col justify-center items-center h-[300px]">
+                    <span className="loading loading-spinner loading-lg text-primary mb-4"></span>
+                    <p className="text-lg font-bold text-gray-700 mb-2">Loading Analytics...</p>
+
+                    {progress.total > 0 && (
+                        <div className="w-full max-w-xs">
+                            <progress
+                                className="progress progress-primary w-full h-4"
+                                value={progress.current}
+                                max={progress.total}
+                            />
+                            <p className="text-center text-sm text-gray-500 mt-2">
+                                {progress.current.toLocaleString()} / {progress.total.toLocaleString()}
+                                <span className="ml-1">
+                                    ({Math.round((progress.current / progress.total) * 100)}%)
+                                </span>
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
     }
 
-    const CustomTooltip = ({ active, payload }) => {
+    if (error) {
+        return (
+            <div className="card bg-base-100 shadow-xl mb-4">
+                <div className="card-body flex justify-center items-center h-[100px]">
+                    <div className="text-center">
+                        <p className="text-error font-bold mb-1">Analytics Error</p>
+                        <p className="text-sm text-gray-500">{error}</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!fullData || fullData.length === 0) {
+        if (cabinetId) {
+            return (
+                <div className="card bg-base-100 shadow-xl mb-4">
+                    <div className="card-body flex justify-center items-center h-[100px]">
+                        <p className="text-gray-500">No analytics data available for this cabinet.</p>
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    }
+
+    const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload && payload.length) {
             const data = payload[0].payload;
+            // Handle different chart types
+            const value = payload[0].value;
+            const name = data.name || label;
+
             return (
-                <div className="bg-base-100 p-2 border border-base-300 shadow-xl rounded text-sm">
-                    <p className="font-bold mb-1">{data.name}</p>
-                    <p>Count: <span className="font-mono">{data.value}</span></p>
-                    <p>Percent: <span className="font-mono">{data.percent.toFixed(1)}%</span></p>
+                <div className="bg-base-100 p-2 border border-base-300 shadow-xl rounded text-sm z-50">
+                    <p className="font-bold mb-1">{name}</p>
+                    <p>Count: <span className="font-mono">{value}</span></p>
+                    {data.percent && <p>Percent: <span className="font-mono">{data.percent.toFixed(1)}%</span></p>}
                 </div>
             );
         }
@@ -106,11 +259,20 @@ const AnalyticsDashboard = ({ results }) => {
     // Custom Legend to show percentages
     const renderLegend = (props) => {
         const { payload } = props;
+        // Sort payload by value descending
+        const sortedPayload = [...payload].sort((a, b) => {
+            const itemA = pieChartData.find(d => d.name === a.value);
+            const itemB = pieChartData.find(d => d.name === b.value);
+            const valA = itemA ? itemA.value : 0;
+            const valB = itemB ? itemB.value : 0;
+            return valB - valA;
+        });
+
         return (
             <ul className="flex flex-col gap-1 max-h-48 overflow-y-auto w-48 text-xs p-2">
                 {
-                    payload.map((entry, index) => {
-                        const dataItem = chartData.find(d => d.name === entry.value);
+                    sortedPayload.map((entry, index) => {
+                        const dataItem = pieChartData.find(d => d.name === entry.value);
                         const percent = dataItem ? dataItem.percent.toFixed(1) : 0;
                         return (
                             <li key={`item-${index}`} className="flex items-center gap-2">
@@ -126,17 +288,17 @@ const AnalyticsDashboard = ({ results }) => {
     }
 
     return (
-        <div className="card bg-base-100 shadow-xl mb-4">
-            <div className="card-body">
-                <div className="flex justify-between items-start mb-4">
-                    <h2 className="card-title text-lg">
-                        📊 Analytics
-                        <div className="badge badge-neutral badge-sm">{results.length} docs</div>
-                    </h2>
-
+        <div className="flex flex-col gap-6">
+            {/* Control Bar & Title */}
+            <div className="card bg-base-100 shadow-xl">
+                <div className="card-body py-4 flex-row justify-between items-center">
+                    <div>
+                        <h2 className="card-title text-xl">Dashboard Analytics</h2>
+                        <p className="text-xs text-gray-500">Analysis for cabinet: {cabinetId}</p>
+                    </div>
                     <div className="form-control w-full max-w-xs">
                         <label className="label py-0">
-                            <span className="label-text-alt">Group By</span>
+                            <span className="label-text-alt">Group By Field</span>
                         </label>
                         <select
                             className="select select-bordered select-sm"
@@ -151,28 +313,147 @@ const AnalyticsDashboard = ({ results }) => {
                         </select>
                     </div>
                 </div>
+            </div>
 
-                <div className="h-[300px] w-full flex items-center justify-center">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie
-                                data={chartData}
-                                cx="50%"
-                                cy="50%"
-                                labelLine={false}
-                                // label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                outerRadius={100}
-                                fill="#8884d8"
-                                dataKey="value"
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="stats shadow">
+                    <div className="stat">
+                        <div className="stat-title">Total Documents</div>
+                        <div className="stat-value text-primary">{kpis.totalDocs?.toLocaleString()}</div>
+                        <div className="stat-desc">in selected cabinet</div>
+                    </div>
+                </div>
+
+                <div className="stats shadow">
+                    <div className="stat">
+                        <div className="stat-title">Unique Values</div>
+                        <div className="stat-value text-secondary">{kpis.uniqueValues?.toLocaleString()}</div>
+                        <div className="stat-desc">for field "{availableFields.find(f => f.name === selectedField)?.label || selectedField}"</div>
+                    </div>
+                </div>
+
+                <div className="stats shadow">
+                    <div className="stat">
+                        <div className="stat-title">Top Category</div>
+                        <div className="stat-value text-accent text-2xl truncate" title={kpis.topCategory}>{kpis.topCategory}</div>
+                        <div className="stat-desc">Most frequent value</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Charts Row 1: Pie + Top 5 Bar */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Pie Chart */}
+                <div className="card bg-base-100 shadow-xl">
+                    <div className="card-body">
+                        <h3 className="card-title text-sm mb-4">Distribution by {selectedField}</h3>
+                        <div className="h-[300px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={pieChartData}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        outerRadius={100}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        {pieChartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <RechartsTooltip content={<CustomTooltip />} />
+                                    <Legend layout="vertical" verticalAlign="middle" align="right" content={renderLegend} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Top 5 Bar Chart */}
+                <div className="card bg-base-100 shadow-xl">
+                    <div className="card-body">
+                        <h3 className="card-title text-sm mb-4">Top 5 {selectedField}</h3>
+                        <div className="h-[300px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                    layout="vertical"
+                                    data={barChartData}
+                                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                    <XAxis type="number" />
+                                    <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} />
+                                    <RechartsTooltip content={<CustomTooltip />} />
+                                    <Bar dataKey="value" fill="#82ca9d" radius={[0, 4, 4, 0]}>
+                                        {barChartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Charts Row 2: Timeline */}
+            <div className="card bg-base-100 shadow-xl">
+                <div className="card-body">
+                    <h3 className="card-title text-sm mb-4">Document Registration Over Time</h3>
+                    <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart
+                                data={timelineData}
+                                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                             >
-                                {chartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis
+                                    dataKey="name"
+                                    angle={-45}
+                                    textAnchor="end"
+                                    height={70}
+                                    interval="preserveStartEnd"
+                                />
+                                <YAxis />
+                                <RechartsTooltip content={<CustomTooltip />} />
+                                <Area type="monotone" dataKey="count" stroke="#8884d8" fill="#8884d8" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
+
+            {/* Detailed Table */}
+            <div className="card bg-base-100 shadow-xl">
+                <div className="card-body">
+                    <h3 className="card-title text-sm mb-4">Detailed Breakdown</h3>
+                    <div className="overflow-x-auto max-h-[400px]">
+                        <table className="table table-pin-rows">
+                            <thead>
+                                <tr>
+                                    <th>Value ({selectedField})</th>
+                                    <th>Count</th>
+                                    <th>Percentage</th>
+                                    <th>Preview</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pieChartData.map((row, index) => (
+                                    <tr key={index} className="hover">
+                                        <td className="font-bold">{row.name}</td>
+                                        <td>{row.value.toLocaleString()}</td>
+                                        <td>{row.percent.toFixed(2)}%</td>
+                                        <td>
+                                            <progress className="progress progress-primary w-20" value={row.percent} max="100"></progress>
+                                        </td>
+                                    </tr>
                                 ))}
-                            </Pie>
-                            <RechartsTooltip content={<CustomTooltip />} />
-                            <Legend layout="vertical" verticalAlign="middle" align="right" content={renderLegend} />
-                        </PieChart>
-                    </ResponsiveContainer>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

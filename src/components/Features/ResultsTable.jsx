@@ -189,7 +189,13 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
             let date;
 
             if (typeof value === 'string') {
-                date = new Date(value);
+                // Handle ASP.NET AJAX JSON format: /Date(1234567890)/
+                const msDateMatch = value.match(/\/Date\((\d+)\)\//);
+                if (msDateMatch) {
+                    date = new Date(parseInt(msDateMatch[1], 10));
+                } else {
+                    date = new Date(value);
+                }
             } else if (typeof value === 'number') {
                 date = new Date(value);
             } else {
@@ -216,8 +222,63 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
     };
 
     const getFieldValue = (doc, column) => {
+        // Helper to find a field case-insensitive
+        const findField = (obj, key) => {
+            if (!obj) return undefined;
+            const searchKey = key.toLowerCase();
+            return Object.keys(doc).find(k => k.toLowerCase() === searchKey);
+        };
+
+        const findInFieldsArray = (fields, key) => {
+            if (!fields || !Array.isArray(fields)) return undefined;
+            const searchKey = key.toLowerCase();
+            return fields.find(f =>
+                (f.FieldName && f.FieldName.toLowerCase() === searchKey) ||
+                (f.DBName && f.DBName.toLowerCase() === searchKey)
+            );
+        };
+
         if (column.type === 'standard') {
-            const value = doc[column.name];
+            // 1. Try direct property access (case-insensitive)
+            let value;
+            const directKey = findField(doc, column.name);
+            if (directKey) {
+                value = doc[directKey];
+            }
+
+            // 2. Special handling for Date fields
+            if (column.name === 'CreatedAt') {
+                // Try specific DocuWare date keys
+                const dateKeys = ['DWStoreDateTime', 'StoreDateTime', 'CreatedAt', 'dwstoredatetime'];
+                for (const key of dateKeys) {
+                    const foundKey = findField(doc, key);
+                    if (foundKey) {
+                        value = doc[foundKey];
+                        break;
+                    }
+                }
+
+                // Fallback to Fields array
+                if (!value) {
+                    const field = findInFieldsArray(doc.Fields, 'DWSTOREDATETIME');
+                    if (field) value = field.Item;
+                }
+            } else if (column.name === 'LastModified') {
+                const dateKeys = ['DWModDateTime', 'ModDateTime', 'LastModified', 'dwmoddatetime'];
+                for (const key of dateKeys) {
+                    const foundKey = findField(doc, key);
+                    if (foundKey) {
+                        value = doc[foundKey];
+                        break;
+                    }
+                }
+
+                // Fallback to Fields array
+                if (!value) {
+                    const field = findInFieldsArray(doc.Fields, 'DWMODDATETIME');
+                    if (field) value = field.Item;
+                }
+            }
 
             if (column.name === 'FileSize') {
                 return formatFileSize(value);
@@ -229,14 +290,14 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
             return value || '-';
         }
 
-        if (doc.Fields && Array.isArray(doc.Fields)) {
-            const field = doc.Fields.find(f => f.FieldName === column.name);
-            if (field) {
-                if (field.ItemElementName === 'Date' || field.FieldName.toLowerCase().includes('date')) {
-                    return formatDate(field.Item);
-                }
-                return field.Item || field.ItemElementName || '-';
+        // Handle Custom Fields
+        const field = findInFieldsArray(doc.Fields, column.name);
+        if (field) {
+            // Check for Date or DateTime types
+            if (field.ItemElementName === 'Date' || field.ItemElementName === 'DateTime' || (field.FieldName && field.FieldName.toLowerCase().includes('date'))) {
+                return formatDate(field.Item);
             }
+            return field.Item || '-';
         }
 
         return '-';

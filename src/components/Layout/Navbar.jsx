@@ -1,12 +1,31 @@
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const Navbar = () => {
     const { user, logout } = useAuth();
+    const location = useLocation();
 
     return (
         <div className="navbar bg-base-100 shadow-md">
-            <div className="flex-1">
-                <a className="btn btn-ghost text-xl">DocuWare Integration</a>
+            <div className="flex-1 gap-4">
+                <Link to="/dashboard" className="btn btn-ghost text-xl">DocuWare Integration</Link>
+
+                {user && (
+                    <div className="flex gap-2">
+                        <Link
+                            to="/dashboard"
+                            className={`btn btn-sm ${location.pathname === '/dashboard' ? 'btn-primary' : 'btn-ghost'}`}
+                        >
+                            Dashboard
+                        </Link>
+                        <Link
+                            to="/analytics"
+                            className={`btn btn-sm ${location.pathname === '/analytics' ? 'btn-primary' : 'btn-ghost'}`}
+                        >
+                            Analytics
+                        </Link>
+                    </div>
+                )}
             </div>
             <div className="flex-none">
                 {user ? (

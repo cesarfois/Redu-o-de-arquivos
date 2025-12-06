@@ -5,7 +5,7 @@ import ErrorMessage from '../Common/ErrorMessage';
 
 const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
     const [cabinets, setCabinets] = useState([]);
-    const [selectedCabinet, setSelectedCabinet] = useState('');
+    const [selectedCabinet, setSelectedCabinet] = useState(localStorage.getItem('selectedCabinetId') || '');
     const [fields, setFields] = useState([]);
     const [filters, setFilters] = useState([{ fieldName: '', value: '' }]);
     const [loading, setLoading] = useState(false);
@@ -13,6 +13,10 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
 
     useEffect(() => {
         fetchCabinets();
+        // Notify parent if we have a stored cabinet
+        if (selectedCabinet && onCabinetChange) {
+            onCabinetChange(selectedCabinet);
+        }
     }, []);
 
     useEffect(() => {
@@ -26,7 +30,8 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
             setLoading(true);
             onLog('Fetching file cabinets...');
             const data = await docuwareService.getCabinets();
-            setCabinets(data);
+            const sortedData = data.sort((a, b) => a.Name.localeCompare(b.Name));
+            setCabinets(sortedData);
             onLog(`Found ${data.length} file cabinets`);
         } catch (err) {
             setError('Failed to load cabinets: ' + err.message);
@@ -100,6 +105,13 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
                         onChange={(e) => {
                             const newValue = e.target.value;
                             setSelectedCabinet(newValue);
+
+                            if (newValue) {
+                                localStorage.setItem('selectedCabinetId', newValue);
+                            } else {
+                                localStorage.removeItem('selectedCabinetId');
+                            }
+
                             if (onCabinetChange) {
                                 onCabinetChange(newValue);
                             }

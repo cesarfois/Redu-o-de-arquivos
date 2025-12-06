@@ -106,6 +106,75 @@ export const docuwareService = {
         };
     },
 
+    // 4.5 Get All Documents for Analytics (Optimized Parallel Fetch)
+    getAllDocuments: async (cabinetId, onProgress) => {
+        try {
+            console.log(`[Service] Starting optimized fetch for cabinet: ${cabinetId}`);
+
+            // Step 1: Get total count first
+            const totalCount = await docuwareService.getCabinetCount(cabinetId);
+            console.log(`[Service] Total documents to fetch: ${totalCount}`);
+
+            if (totalCount === 0) return [];
+
+            if (onProgress) {
+                onProgress(0, totalCount);
+            }
+
+            const CHUNK_SIZE = 2000;
+            const BATCH_SIZE = 5;
+            const TIMEOUT_MS = 120000;
+            let allItems = [];
+            let totalLoaded = 0;
+            const starts = [];
+
+            // Step 2: Calculate all start positions
+            for (let start = 0; start < totalCount; start += CHUNK_SIZE) {
+                starts.push(start);
+            }
+
+            console.log(`[Service] Plan: ${starts.length} requests in batches of ${BATCH_SIZE}`);
+
+            // Step 3: Process in batches
+            for (let i = 0; i < starts.length; i += BATCH_SIZE) {
+                const currentBatchStarts = starts.slice(i, i + BATCH_SIZE);
+                console.log(`[Service] Fetching batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(starts.length / BATCH_SIZE)} (Items ${currentBatchStarts[0]} - ${currentBatchStarts[currentBatchStarts.length - 1] + CHUNK_SIZE})...`);
+
+                const batchPromises = currentBatchStarts.map(start =>
+                    api.get(`/FileCabinets/${cabinetId}/Documents`, {
+                        params: {
+                            count: CHUNK_SIZE,
+                            calculateTotalCount: false,
+                            start: start
+                        },
+                        timeout: TIMEOUT_MS
+                    }).then(response => {
+                        const items = response.data.Items || [];
+                        totalLoaded += items.length;
+                        if (onProgress) onProgress(totalLoaded, totalCount);
+                        return items;
+                    })
+                        .catch(err => {
+                            console.error(`[Service] Failed to fetch chunk starting at ${start}`, err);
+                            return [];
+                        })
+                );
+
+                const batchResults = await Promise.all(batchPromises);
+
+                batchResults.forEach(items => {
+                    allItems = [...allItems, ...items];
+                });
+            }
+
+            console.log(`[Service] Fetch complete. Total loaded: ${allItems.length}`);
+            return allItems;
+        } catch (error) {
+            console.error('Error fetching all items for analytics:', error);
+            throw error;
+        }
+    },
+
     // 5. Get Document View URL
     getDocumentViewUrl: (cabinetId, documentId) => {
         // Get the base URL from session storage

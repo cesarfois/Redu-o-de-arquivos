@@ -3,7 +3,6 @@ import Navbar from '../components/Layout/Navbar';
 import Footer from '../components/Layout/Footer';
 import SearchForm from '../components/Features/SearchForm';
 import ResultsTable from '../components/Features/ResultsTable';
-import AnalyticsDashboard from '../components/Features/AnalyticsDashboard';
 import LogConsole from '../components/Features/LogConsole';
 import { docuwareService } from '../services/docuwareService';
 
@@ -79,10 +78,6 @@ const DashboardPage = () => {
                     />
                     <LogConsole logs={logs} />
                 </div>
-
-                {results.length > 0 && (
-                    <AnalyticsDashboard results={results} />
-                )}
 
                 <ResultsTable results={results} totalDocs={totalDocs} cabinetId={cabinetId} />
             </main>
