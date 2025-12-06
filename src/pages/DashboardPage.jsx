@@ -67,16 +67,20 @@ const DashboardPage = () => {
             <Navbar />
 
             <main className="flex-1 container mx-auto p-4">
-                <h1 className="text-3xl font-bold mb-6">DocuWare Dashboard</h1>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                    <h1 className="text-3xl font-bold">DocuWare Dashboard</h1>
+                    <div className="w-full md:w-1/3 lg:w-1/4">
+                        <LogConsole logs={logs} />
+                    </div>
+                </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div className="flex flex-col gap-4 mb-4">
                     <SearchForm
                         onSearch={handleSearch}
                         onLog={addLog}
                         totalCount={totalCount}
                         onCabinetChange={handleCabinetSelect}
                     />
-                    <LogConsole logs={logs} />
                 </div>
 
                 <ResultsTable results={results} totalDocs={totalDocs} cabinetId={cabinetId} />

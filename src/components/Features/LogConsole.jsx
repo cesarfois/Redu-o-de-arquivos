@@ -8,7 +8,7 @@ const LogConsole = ({ logs }) => {
     }, [logs]);
 
     return (
-        <div className="mockup-code mt-8 bg-black text-green-400 h-48 overflow-y-auto">
+        <div className="mockup-code bg-black text-green-400 h-14 overflow-y-auto text-[10px] py-1 leading-tight">
             {logs.map((log, index) => (
                 <pre key={index} data-prefix=">">
                     <code>{log}</code>
