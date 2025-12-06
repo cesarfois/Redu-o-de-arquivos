@@ -61,6 +61,7 @@ const AnalyticsPage = () => {
                                     value={selectedCabinetId}
                                     onChange={handleCabinetChange}
                                 >
+                                    <option value="">Selecione o armário</option>
                                     {cabinets.map((cabinet) => (
                                         <option key={cabinet.Id} value={cabinet.Id}>
                                             {cabinet.Name}

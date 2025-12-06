@@ -6,6 +6,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 
 const AnalyticsDashboard = ({ cabinetId }) => {
     const [selectedField, setSelectedField] = useState('');
+    const [filterValue, setFilterValue] = useState(''); // New state for secondary filter
     const [availableFields, setAvailableFields] = useState([]);
     const [fullData, setFullData] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -83,6 +84,11 @@ const AnalyticsDashboard = ({ cabinetId }) => {
         }
     }, [fullData, selectedField]);
 
+    // Reset filter when field changes
+    useEffect(() => {
+        setFilterValue('');
+    }, [selectedField]);
+
     const getFieldValue = (doc, fieldName) => {
         // Check standard first
         if (doc[fieldName] !== undefined) return doc[fieldName];
@@ -97,15 +103,31 @@ const AnalyticsDashboard = ({ cabinetId }) => {
         return 'Unknown';
     };
 
+    // Get unique values for the current field for the dropdown
+    const uniqueValues = useMemo(() => {
+        if (!fullData || !selectedField) return [];
+        const values = new Set();
+        fullData.forEach(doc => {
+            const val = getFieldValue(doc, selectedField);
+            if (val) values.add(String(val));
+        });
+        return Array.from(values).sort();
+    }, [fullData, selectedField]);
+
     // Process data for charts
     const { pieChartData, barChartData, timelineData, kpis } = useMemo(() => {
         if (!fullData || fullData.length === 0) return { pieChartData: [], barChartData: [], timelineData: [], kpis: {} };
+
+        // Apply Filter if selected
+        const dataToProcess = filterValue
+            ? fullData.filter(doc => String(getFieldValue(doc, selectedField)) === filterValue)
+            : fullData;
 
         const counts = {};
         const dateCounts = {};
         let total = 0;
 
-        fullData.forEach(doc => {
+        dataToProcess.forEach(doc => {
             // Group by selected field
             const value = getFieldValue(doc, selectedField);
             const key = value ? String(value) : 'Empty';
@@ -183,7 +205,7 @@ const AnalyticsDashboard = ({ cabinetId }) => {
 
         return { pieChartData: pieData, barChartData: barData, timelineData: timeline, kpis: kpiData };
 
-    }, [fullData, selectedField]);
+    }, [fullData, selectedField, filterValue]);
 
     if (loading) {
         return (
@@ -319,26 +341,45 @@ const AnalyticsDashboard = ({ cabinetId }) => {
         <div className="flex flex-col gap-6">
             {/* Control Bar & Title */}
             <div className="card bg-base-100 shadow-xl">
-                <div className="card-body py-4 flex-row justify-between items-center">
-                    <div>
-                        <h2 className="card-title text-xl">Dashboard Analytics</h2>
-                        <p className="text-xs text-gray-500">Analysis for cabinet: {cabinetId}</p>
-                    </div>
-                    <div className="form-control w-full max-w-xs">
-                        <label className="label py-0">
-                            <span className="label-text-alt">Group By Field</span>
-                        </label>
-                        <select
-                            className="select select-bordered select-sm"
-                            value={selectedField}
-                            onChange={(e) => setSelectedField(e.target.value)}
-                        >
-                            {availableFields.map(field => (
-                                <option key={field.name} value={field.name}>
-                                    {field.label}
-                                </option>
-                            ))}
-                        </select>
+                <div className="card-body">
+                    <div className="flex flex-col md:flex-row gap-4 justify-between items-end">
+                        <div>
+                            <h3 className="card-title text-sm mb-2">Dashboard Analytics</h3>
+                            <p className="text-xs text-gray-500">Analysis for cabinet: {cabinetId}</p>
+                        </div>
+                        <div className="flex gap-4">
+                            <div className="form-control w-full max-w-xs">
+                                <label className="label">
+                                    <span className="label-text">Group By Field</span>
+                                </label>
+                                <select
+                                    className="select select-bordered select-sm"
+                                    value={selectedField}
+                                    onChange={(e) => setSelectedField(e.target.value)}
+                                >
+                                    {availableFields.map(field => (
+                                        <option key={field.name} value={field.name}>{field.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="form-control w-full max-w-xs">
+                                <label className="label">
+                                    <span className="label-text">Filter Value (Optional)</span>
+                                </label>
+                                <select
+                                    className="select select-bordered select-sm"
+                                    value={filterValue}
+                                    onChange={(e) => setFilterValue(e.target.value)}
+                                    disabled={!selectedField}
+                                >
+                                    <option value="">All Values</option>
+                                    {uniqueValues.map(val => (
+                                        <option key={val} value={val}>{val}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -347,8 +388,8 @@ const AnalyticsDashboard = ({ cabinetId }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="stats shadow">
                     <div className="stat">
-                        <div className="stat-title">Total Documents</div>
-                        <div className="stat-value text-primary">{kpis.totalDocs?.toLocaleString()}</div>
+                        <div className="stat-title">Unique Values</div>
+                        <div className="stat-value text-secondary">{kpis.uniqueValues?.toLocaleString()}</div>
                         <div className="stat-desc">in selected cabinet</div>
                     </div>
                 </div>
@@ -368,12 +409,12 @@ const AnalyticsDashboard = ({ cabinetId }) => {
                         <div className="stat-desc">Most frequent value</div>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* Charts Row 1: Pie + Top 5 Bar */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            < div className="grid grid-cols-1 lg:grid-cols-2 gap-6" >
                 {/* Pie Chart */}
-                <div className="card bg-base-100 shadow-xl">
+                < div className="card bg-base-100 shadow-xl" >
                     <div className="card-body">
                         <h3 className="card-title text-sm mb-4">Distribution by {selectedField}</h3>
                         <div className="h-[300px] w-full">
@@ -398,10 +439,10 @@ const AnalyticsDashboard = ({ cabinetId }) => {
                             </ResponsiveContainer>
                         </div>
                     </div>
-                </div>
+                </div >
 
                 {/* Top 5 Bar Chart */}
-                <div className="card bg-base-100 shadow-xl">
+                < div className="card bg-base-100 shadow-xl" >
                     <div className="card-body">
                         <h3 className="card-title text-sm mb-4">Top 5 {selectedField}</h3>
                         <div className="h-[300px] w-full">
@@ -424,11 +465,11 @@ const AnalyticsDashboard = ({ cabinetId }) => {
                             </ResponsiveContainer>
                         </div>
                     </div>
-                </div>
-            </div>
+                </div >
+            </div >
 
             {/* Charts Row 2: Timeline */}
-            <div className="card bg-base-100 shadow-xl">
+            < div className="card bg-base-100 shadow-xl" >
                 <div className="card-body">
                     <h3 className="card-title text-sm mb-4">Document Registration Over Time</h3>
                     <div className="flex flex-col gap-6">
@@ -483,10 +524,10 @@ const AnalyticsDashboard = ({ cabinetId }) => {
                         </div>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* Detailed Table */}
-            <div className="card bg-base-100 shadow-xl">
+            < div className="card bg-base-100 shadow-xl" >
                 <div className="card-body">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="card-title text-sm">Detailed Breakdown</h3>
@@ -523,8 +564,8 @@ const AnalyticsDashboard = ({ cabinetId }) => {
                         </table>
                     </div>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 

@@ -117,7 +117,7 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
                             }
                         }}
                     >
-                        <option value="">Select a cabinet...</option>
+                        <option value="">Selecione o armário</option>
                         {cabinets.map((cab) => (
                             <option key={cab.Id} value={cab.Id}>
                                 {cab.Name}
