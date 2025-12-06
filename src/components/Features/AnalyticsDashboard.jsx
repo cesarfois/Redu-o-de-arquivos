@@ -285,7 +285,35 @@ const AnalyticsDashboard = ({ cabinetId }) => {
                 }
             </ul>
         );
-    }
+    };
+
+    const handleExportBreakdown = () => {
+        if (!pieChartData || pieChartData.length === 0) return;
+
+        // Headers
+        const headers = [`Value (${selectedField})`, 'Count', 'Percentage'];
+
+        // Rows
+        const csvContent = [
+            headers.join(','),
+            ...pieChartData.map(row => {
+                const value = `"${String(row.name).replace(/"/g, '""')}"`;
+                const count = row.value;
+                const percent = row.percent.toFixed(2);
+                return `${value},${count},${percent}%`;
+            })
+        ].join('\n');
+
+        // Download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `analytics_breakdown_${selectedField}_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     return (
         <div className="flex flex-col gap-6">
@@ -403,25 +431,56 @@ const AnalyticsDashboard = ({ cabinetId }) => {
             <div className="card bg-base-100 shadow-xl">
                 <div className="card-body">
                     <h3 className="card-title text-sm mb-4">Document Registration Over Time</h3>
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart
-                                data={timelineData}
-                                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis
-                                    dataKey="name"
-                                    angle={-45}
-                                    textAnchor="end"
-                                    height={70}
-                                    interval="preserveStartEnd"
-                                />
-                                <YAxis />
-                                <RechartsTooltip content={<CustomTooltip />} />
-                                <Area type="monotone" dataKey="count" stroke="#8884d8" fill="#8884d8" />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                    <div className="flex flex-col gap-6">
+                        {/* Chart */}
+                        <div className="h-[300px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart
+                                    data={timelineData}
+                                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis
+                                        dataKey="name"
+                                        angle={-45}
+                                        textAnchor="end"
+                                        height={70}
+                                        interval="preserveStartEnd"
+                                    />
+                                    <YAxis />
+                                    <RechartsTooltip content={<CustomTooltip />} />
+                                    <Area type="monotone" dataKey="count" stroke="#8884d8" fill="#8884d8" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        {/* Monthly Stats Table */}
+                        <div className="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" />
+                            <div className="collapse-title text-sm font-medium">
+                                Show Monthly Statistics Table
+                            </div>
+                            <div className="collapse-content">
+                                <div className="overflow-x-auto max-h-[300px]">
+                                    <table className="table table-sm table-pin-rows">
+                                        <thead>
+                                            <tr>
+                                                <th>Month</th>
+                                                <th>Documents Added</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {[...timelineData].reverse().map((row, index) => (
+                                                <tr key={index} className="hover">
+                                                    <td className="font-mono">{row.name}</td>
+                                                    <td className="font-bold text-primary">{row.count}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -429,7 +488,16 @@ const AnalyticsDashboard = ({ cabinetId }) => {
             {/* Detailed Table */}
             <div className="card bg-base-100 shadow-xl">
                 <div className="card-body">
-                    <h3 className="card-title text-sm mb-4">Detailed Breakdown</h3>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="card-title text-sm">Detailed Breakdown</h3>
+                        <button
+                            className="btn btn-sm btn-ghost gap-2"
+                            onClick={handleExportBreakdown}
+                            disabled={!pieChartData || pieChartData.length === 0}
+                        >
+                            📥 Export CSV
+                        </button>
+                    </div>
                     <div className="overflow-x-auto max-h-[400px]">
                         <table className="table table-pin-rows">
                             <thead>
