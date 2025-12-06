@@ -74,7 +74,8 @@ const AnalyticsDashboard = ({ cabinetId }) => {
 
         // Remove duplicates if any
         const uniqueFields = Array.from(new Set(fields.map(f => f.name)))
-            .map(name => fields.find(f => f.name === name));
+            .map(name => fields.find(f => f.name === name))
+            .sort((a, b) => a.label.localeCompare(b.label));
 
         setAvailableFields(uniqueFields);
 
@@ -388,8 +389,8 @@ const AnalyticsDashboard = ({ cabinetId }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="stats shadow">
                     <div className="stat">
-                        <div className="stat-title">Unique Values</div>
-                        <div className="stat-value text-secondary">{kpis.uniqueValues?.toLocaleString()}</div>
+                        <div className="stat-title">Total Documents</div>
+                        <div className="stat-value text-primary">{kpis.totalDocs?.toLocaleString()}</div>
                         <div className="stat-desc">in selected cabinet</div>
                     </div>
                 </div>

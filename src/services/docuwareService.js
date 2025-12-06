@@ -106,6 +106,33 @@ export const docuwareService = {
         };
     },
 
+    // 4.4 Get Select List (Unique Values for a Field)
+    getSelectList: async (cabinetId, fieldName) => {
+        try {
+            const dialogs = await docuwareService.getDialogs(cabinetId);
+            const searchDialog = dialogs.find(d => d.Type === 'Search') || dialogs[0];
+
+            if (!searchDialog) return [];
+
+            const response = await api.post(
+                `/FileCabinets/${cabinetId}/Query/SelectListExpression`,
+                {
+                    DialogId: searchDialog.Id,
+                    FieldName: fieldName,
+                    ExcludeExternalData: false
+                },
+                {
+                    params: { dialogId: searchDialog.Id }
+                }
+            );
+
+            return response.data.Value || [];
+        } catch (error) {
+            console.error("Failed to get select list:", error);
+            return [];
+        }
+    },
+
     // 4.5 Get All Documents for Analytics (Optimized Parallel Fetch)
     getAllDocuments: async (cabinetId, onProgress) => {
         try {
