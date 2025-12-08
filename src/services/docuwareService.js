@@ -9,8 +9,30 @@ export const docuwareService = {
 
     // 2. Get File Cabinet Fields (for filtering)
     getCabinetFields: async (cabinetId) => {
-        const response = await api.get(`/FileCabinets/${cabinetId}`);
-        return response.data.Fields || [];
+        if (!cabinetId) throw new Error("Cabinet ID is required");
+        try {
+            const response = await api.get(`/FileCabinets/${cabinetId}`);
+            if (response.data && response.data.Fields) {
+                return response.data.Fields;
+            }
+
+            // Fallback: try direct fields endpoint
+            console.warn(`Fields not found in cabinet root for ${cabinetId}, trying /Fields...`);
+            try {
+                // Try the dedicated fields endpoint often present in DocuWare REST API
+                const fieldRes = await api.get(`/FileCabinets/${cabinetId}/Fields`);
+                if (fieldRes.data && fieldRes.data.Fields) {
+                    return fieldRes.data.Fields;
+                }
+            } catch (fallbackErr) {
+                console.warn("Fallback to /Fields failed:", fallbackErr);
+            }
+
+            return [];
+        } catch (error) {
+            console.error("Error in getCabinetFields:", error);
+            throw error;
+        }
     },
 
     // 2.5 Get Cabinet Document Count

@@ -4,7 +4,7 @@ import StatusConfig from './StatusConfig';
 import ColumnFilter from './ColumnFilter';
 import ColumnSelector from './ColumnSelector';
 
-const ResultsTable = ({ results, totalDocs, cabinetId }) => {
+const ResultsTable = ({ results, totalDocs, cabinetId, renderCustomColumn, initialVisibleColumns, getCustomStatusValue }) => {
     const [visibleColumns, setVisibleColumns] = useState({});
     const [allColumns, setAllColumns] = useState([]);
     const [statusConfig, setStatusConfig] = useState(null);
@@ -48,16 +48,34 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
             });
         }
 
+        // Sort columns to match initialVisibleColumns order if provided
+        if (initialVisibleColumns && initialVisibleColumns.length > 0) {
+            const orderMap = new Map(initialVisibleColumns.map((name, index) => [name, index]));
+            columns.sort((a, b) => {
+                const indexA = orderMap.has(a.name) ? orderMap.get(a.name) : 9999;
+                const indexB = orderMap.has(b.name) ? orderMap.get(b.name) : 9999;
+                return indexA - indexB;
+            });
+        }
+
         setAllColumns(columns);
 
-        // Set default visible columns (show first 6 columns by default)
+        // Set default visible columns
         const defaultVisible = {};
-        columns.slice(0, 6).forEach(col => {
-            defaultVisible[col.name] = true;
-        });
+        if (initialVisibleColumns && initialVisibleColumns.length > 0) {
+            initialVisibleColumns.forEach(fieldName => {
+                defaultVisible[fieldName] = true;
+            });
+        } else {
+            // Default: show first 6 columns
+            columns.slice(0, 6).forEach(col => {
+                defaultVisible[col.name] = true;
+            });
+        }
+
         setVisibleColumns(defaultVisible);
         setFilteredResults(results);
-    }, [results]);
+    }, [results, initialVisibleColumns]);
 
     // Apply column filters and sorting
     useEffect(() => {
@@ -73,11 +91,15 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
             const selectedValues = columnFilters[columnName];
             if (selectedValues && selectedValues.length > 0) {
                 filtered = filtered.filter(doc => {
-                    const column = allColumns.find(col => col.name === columnName);
-                    if (!column) return true;
-
-                    const cellValue = getFieldValue(doc, column);
-                    return selectedValues.includes(cellValue.toString());
+                    let cellValue;
+                    if (columnName === 'customStatus' && getCustomStatusValue) {
+                        cellValue = getCustomStatusValue(doc);
+                    } else {
+                        const column = allColumns.find(col => col.name === columnName);
+                        if (!column) return true;
+                        cellValue = getFieldValue(doc, column);
+                    }
+                    return selectedValues.includes(String(cellValue));
                 });
             }
         });
@@ -85,18 +107,24 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
         // Apply sorting
         if (sortColumn) {
             filtered.sort((a, b) => {
-                const column = allColumns.find(col => col.name === sortColumn);
-                if (!column) return 0;
+                let aValue, bValue;
 
-                const aValue = getFieldValue(a, column);
-                const bValue = getFieldValue(b, column);
+                if (sortColumn === 'customStatus' && getCustomStatusValue) {
+                    aValue = getCustomStatusValue(a);
+                    bValue = getCustomStatusValue(b);
+                } else {
+                    const column = allColumns.find(col => col.name === sortColumn);
+                    if (!column) return 0;
+                    aValue = getFieldValue(a, column);
+                    bValue = getFieldValue(b, column);
+                }
 
                 // Handle different types
                 let comparison = 0;
                 if (typeof aValue === 'number' && typeof bValue === 'number') {
                     comparison = aValue - bValue;
                 } else {
-                    comparison = String(aValue).localeCompare(String(bValue));
+                    comparison = String(aValue || '').localeCompare(String(bValue || ''));
                 }
 
                 return sortDirection === 'asc' ? comparison : -comparison;
@@ -104,7 +132,7 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
         }
 
         setFilteredResults(filtered);
-    }, [columnFilters, results, allColumns, sortColumn, sortDirection]);
+    }, [columnFilters, results, allColumns, sortColumn, sortDirection, getCustomStatusValue]);
 
     // Reset to page 1 when filters or sorting changes
     useEffect(() => {
@@ -115,8 +143,13 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
     const getUniqueValues = (column) => {
         const values = new Set();
         results.forEach(doc => {
-            const value = getFieldValue(doc, column);
-            values.add(value.toString());
+            let value;
+            if (column.name === 'customStatus' && getCustomStatusValue) {
+                value = getCustomStatusValue(doc);
+            } else {
+                value = getFieldValue(doc, column);
+            }
+            values.add(String(value || ''));
         });
         return Array.from(values).sort();
     };
@@ -418,6 +451,47 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
         document.body.removeChild(link);
     };
 
+    const handleColumnDragStart = (e, index) => {
+        e.dataTransfer.setData("colIndex", index);
+        e.dataTransfer.effectAllowed = "move";
+    };
+
+    const handleColumnDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+    };
+
+    const handleColumnDrop = (e, targetIndex) => {
+        e.preventDefault();
+        const sourceIndex = parseInt(e.dataTransfer.getData("colIndex"));
+        if (sourceIndex === targetIndex || isNaN(sourceIndex)) return;
+
+        const visibleColsList = allColumns.filter(col => visibleColumns[col.name]);
+        const sourceCol = visibleColsList[sourceIndex];
+        const targetCol = visibleColsList[targetIndex];
+
+        if (!sourceCol || !targetCol) return;
+
+        const newAllColumns = [...allColumns];
+        const sourceRealIndex = newAllColumns.findIndex(c => c.name === sourceCol.name);
+
+        // Remove source
+        newAllColumns.splice(sourceRealIndex, 1);
+
+        // Find target index in the array *after* removal
+        let targetRealIndex = newAllColumns.findIndex(c => c.name === targetCol.name);
+
+        // If moving down/right, insert AFTER the target
+        if (sourceIndex < targetIndex) {
+            targetRealIndex += 1;
+        }
+
+        // Insert at target
+        newAllColumns.splice(targetRealIndex, 0, sourceCol);
+
+        setAllColumns(newAllColumns);
+    };
+
     return (
         <div className="card bg-base-100 shadow-xl">
             <div className="card-body">
@@ -455,15 +529,7 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
                                 )}
                             />
 
-                            <StatusConfig
-                                fields={allColumns}
-                                onConfigChange={setStatusConfig}
-                                customTrigger={(onClick) => (
-                                    <li onClick={onClick}>
-                                        <a>🚦 Status Indicator</a>
-                                    </li>
-                                )}
-                            />
+
 
                             {activeFiltersCount > 0 && (
                                 <li>
@@ -480,14 +546,49 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
                     <table className="table table-zebra table-sm">
                         <thead>
                             <tr>
-                                {statusConfig && <th className="text-xs">Status</th>}
-                                {visibleCols.map(col => {
+                                {renderCustomColumn && (
+                                    <th className="text-xs">
+                                        <div className="flex items-center gap-1">
+                                            <span
+                                                className="cursor-pointer hover:text-primary transition-colors select-none flex items-center gap-1"
+                                                onClick={() => handleSort('customStatus')}
+                                                title="Click to sort by Status"
+                                            >
+                                                Status
+                                                {sortColumn === 'customStatus' && (
+                                                    <span className="text-primary text-[10px]">
+                                                        {sortDirection === 'asc' ? '▲' : '▼'}
+                                                    </span>
+                                                )}
+                                            </span>
+                                            {getCustomStatusValue && (
+                                                <ColumnFilter
+                                                    column={{ name: 'customStatus', label: 'Status' }}
+                                                    uniqueValues={getUniqueValues({ name: 'customStatus' })}
+                                                    selectedValues={columnFilters['customStatus'] || []}
+                                                    onToggleValue={toggleFilterValue}
+                                                    onSelectAll={selectAllValues}
+                                                    onClear={clearColumnFilter}
+                                                />
+                                            )}
+                                        </div>
+                                    </th>
+                                )}
+                                {statusConfig && <th className="text-xs">Indicator</th>}
+                                {visibleCols.map((col, idx) => {
                                     const hasFilter = columnFilters[col.name] && columnFilters[col.name].length > 0;
                                     const uniqueValues = getUniqueValues(col);
                                     const selectedValues = columnFilters[col.name] || [];
 
                                     return (
-                                        <th key={col.name}>
+                                        <th
+                                            key={col.name}
+                                            draggable
+                                            onDragStart={(e) => handleColumnDragStart(e, idx)}
+                                            onDragOver={handleColumnDragOver}
+                                            onDrop={(e) => handleColumnDrop(e, idx)}
+                                            className="cursor-move hover:bg-base-200 transition-colors"
+                                        >
                                             <div className="flex items-center gap-1">
                                                 <span
                                                     className="text-xs cursor-pointer hover:text-primary transition-colors select-none"
@@ -521,6 +622,13 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
                                 const statusColor = getStatusColor(doc);
                                 return (
                                     <tr key={doc.Id || idx}>
+                                        {renderCustomColumn && (
+                                            <td>
+                                                <div className="flex justify-center">
+                                                    {renderCustomColumn(doc)}
+                                                </div>
+                                            </td>
+                                        )}
                                         {statusConfig && (
                                             <td>
                                                 <div className="flex justify-center">
@@ -643,7 +751,7 @@ const ResultsTable = ({ results, totalDocs, cabinetId }) => {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 };
 

@@ -7,6 +7,7 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
     const [cabinets, setCabinets] = useState([]);
     const [selectedCabinet, setSelectedCabinet] = useState(localStorage.getItem('selectedCabinetId') || '');
     const [fields, setFields] = useState([]);
+    const [allFields, setAllFields] = useState([]); // Store all raw fields
     const [suggestions, setSuggestions] = useState({}); // { [index]: [values] }
     const [filters, setFilters] = useState([{ fieldName: '', value: '' }]);
     const [loading, setLoading] = useState(false);
@@ -47,8 +48,12 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
             setLoading(true);
             onLog(`Fetching fields for cabinet ${selectedCabinet}...`);
             const data = await docuwareService.getCabinetFields(selectedCabinet);
+
+            // Store raw data for passing to parent
+            setAllFields(data || []);
+
             // Filter to show only user-visible fields (not system fields)
-            const userFields = data
+            const userFields = (data || [])
                 .filter(f => !f.SystemField && f.DWFieldType !== 'Memo')
                 .sort((a, b) => (a.DisplayName || a.FieldName).localeCompare(b.DisplayName || b.FieldName));
             setFields(userFields);
@@ -56,6 +61,8 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
         } catch (err) {
             setError('Failed to load fields: ' + err.message);
             onLog('Error: ' + err.message);
+            setFields([]);
+            setAllFields([]);
         } finally {
             setLoading(false);
         }
@@ -85,7 +92,8 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
         const validFilters = filters.filter(f => f.fieldName && f.value);
 
         onLog(`Searching in cabinet ${selectedCabinet} with ${validFilters.length} filters...`);
-        onSearch(selectedCabinet, validFilters);
+        // Pass all raw fields as the 3rd argument
+        onSearch(selectedCabinet, validFilters, allFields);
     };
 
     if (loading) return <LoadingSpinner />;
@@ -116,7 +124,8 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
                             }
 
                             if (onCabinetChange) {
-                                onCabinetChange(newValue);
+                                const cabinet = cabinets.find(c => c.Id === newValue);
+                                onCabinetChange(newValue, cabinet ? cabinet.Name : '');
                             }
                         }}
                     >

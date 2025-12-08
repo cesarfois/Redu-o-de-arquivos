@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import SemaforosPage from './pages/SemaforosPage';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -36,6 +37,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <AnalyticsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/semaforos"
+            element={
+              <ProtectedRoute>
+                <SemaforosPage />
               </ProtectedRoute>
             }
           />

@@ -24,6 +24,14 @@ const Navbar = () => {
                         >
                             Analytics
                         </Link>
+                        {(!localStorage.getItem(`docuware_control_visible_${user.username}`) || localStorage.getItem(`docuware_control_visible_${user.username}`) !== 'false') && (
+                            <Link
+                                to="/semaforos"
+                                className={`btn btn-sm ${location.pathname === '/semaforos' ? 'btn-primary' : 'btn-ghost'}`}
+                            >
+                                Controle Documental
+                            </Link>
+                        )}
                     </div>
                 )}
             </div>
