@@ -16,7 +16,7 @@ const Navbar = () => {
                             to="/dashboard"
                             className={`btn btn-sm ${location.pathname === '/dashboard' ? 'btn-primary' : 'btn-ghost'}`}
                         >
-                            Dashboard
+                            Pesquisa
                         </Link>
                         <Link
                             to="/analytics"

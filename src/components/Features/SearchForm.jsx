@@ -101,7 +101,7 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
     return (
         <div className="card bg-base-100 shadow-xl">
             <div className="card-body">
-                <h2 className="card-title">Search Documents</h2>
+
 
                 {error && <ErrorMessage message={error} />}
 
@@ -138,13 +138,7 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
                     </select>
                 </div>
 
-                {/* Total Count Display */}
-                {selectedCabinet && (
-                    <div className="alert alert-info py-2 mt-2 shadow-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        <span>Total Documents in Cabinet: <span className="font-bold">{totalCount}</span></span>
-                    </div>
-                )}
+
 
                 {/* Filters */}
                 {selectedCabinet && fields.length > 0 && (
@@ -238,8 +232,19 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
                     </div>
                 )}
 
-                {/* Search Button */}
-                <div className="card-actions justify-end mt-4">
+                {/* Bottom Row: Total Count (Left) & Search Button (Right) */}
+                <div className="flex justify-between items-end mt-6">
+                    {/* Total Count Display - Moved here */}
+                    <div>
+                        {selectedCabinet && (
+                            <div className="alert alert-info py-2 shadow-sm inline-flex">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <span>Total Documents in Cabinet: <span className="font-bold">{totalCount}</span></span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Search Button */}
                     <button
                         className="btn btn-primary"
                         onClick={handleSearch}

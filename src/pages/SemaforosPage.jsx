@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { FaTrafficLight } from 'react-icons/fa';
 import Navbar from '../components/Layout/Navbar';
 import Footer from '../components/Layout/Footer';
 import SearchForm from '../components/Features/SearchForm';
@@ -639,7 +640,10 @@ const SemaforosPage = () => {
             <main className="flex-1 container mx-auto p-4">
                 <div className="flex justify-between items-center mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold">Controle Documental</h1>
+                        <div className="flex items-center gap-3 mb-2">
+                            <FaTrafficLight className="w-6 h-6 text-primary" />
+                            <h1 className="text-3xl font-bold">Controle Documental</h1>
+                        </div>
                         <p className="text-gray-500">Gerencie seus controles e status</p>
                     </div>
                     <button onClick={() => setMode('create')} className="btn btn-primary">

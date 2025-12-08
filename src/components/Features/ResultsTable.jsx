@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { FaFileDownload, FaColumns } from 'react-icons/fa';
 import { docuwareService } from '../../services/docuwareService';
 import StatusConfig from './StatusConfig';
 import ColumnFilter from './ColumnFilter';
@@ -506,39 +507,40 @@ const ResultsTable = ({ results, totalDocs, cabinetId, renderCustomColumn, initi
                         )}
                     </h2>
 
-                    <div className="dropdown dropdown-end">
-                        <div tabIndex={0} role="button" className="btn btn-sm btn-ghost">
-                            ⚙️ Options
-                        </div>
-                        <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
-                            <li>
-                                <a onClick={handleExportCSV}>
-                                    📥 Export CSV
-                                </a>
-                            </li>
-
-                            <ColumnSelector
-                                allColumns={allColumns}
-                                visibleColumns={visibleColumns}
-                                onToggleColumn={toggleColumn}
-                                onToggleAll={toggleAll}
-                                customTrigger={(onClick) => (
-                                    <li onClick={onClick}>
-                                        <a>⚙️ Columns</a>
-                                    </li>
-                                )}
-                            />
-
-
-
-                            {activeFiltersCount > 0 && (
-                                <li>
-                                    <a onClick={clearAllFilters} className="text-error">
-                                        🗑️ Clear Filters
-                                    </a>
-                                </li>
+                    <div className="flex gap-2">
+                        <ColumnSelector
+                            allColumns={allColumns}
+                            visibleColumns={visibleColumns}
+                            onToggleColumn={toggleColumn}
+                            onToggleAll={toggleAll}
+                            customTrigger={(onClick) => (
+                                <button
+                                    className="btn btn-sm btn-outline btn-primary gap-2"
+                                    onClick={onClick}
+                                    title="Manage Columns"
+                                >
+                                    <FaColumns /> Columns
+                                </button>
                             )}
-                        </ul>
+                        />
+
+                        <button
+                            className="btn btn-sm btn-outline btn-primary gap-2"
+                            onClick={handleExportCSV}
+                            title="Download CSV"
+                        >
+                            <FaFileDownload /> Export CSV
+                        </button>
+
+                        {activeFiltersCount > 0 && (
+                            <button
+                                onClick={clearAllFilters}
+                                className="btn btn-sm btn-ghost text-error gap-2"
+                                title="Clear all filters"
+                            >
+                                🗑️ Clear Filters
+                            </button>
+                        )}
                     </div>
                 </div>
 

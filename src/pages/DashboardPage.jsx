@@ -5,6 +5,7 @@ import SearchForm from '../components/Features/SearchForm';
 import ResultsTable from '../components/Features/ResultsTable';
 import LogConsole from '../components/Features/LogConsole';
 import { docuwareService } from '../services/docuwareService';
+import { FaSearch } from 'react-icons/fa';
 
 const DashboardPage = () => {
     const [results, setResults] = useState([]);
@@ -68,8 +69,11 @@ const DashboardPage = () => {
 
             <main className="flex-1 container mx-auto p-4">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                    <h1 className="text-3xl font-bold">DocuWare Dashboard</h1>
-                    <div className="w-full md:w-1/3 lg:w-1/4">
+                    <div className="flex items-center gap-3">
+                        <FaSearch className="w-6 h-6 text-primary" />
+                        <h1 className="text-3xl font-bold">Pesquisa de Documentos</h1>
+                    </div>
+                    <div className="w-full md:w-1/2 lg:w-2/5">
                         <LogConsole logs={logs} />
                     </div>
                 </div>

@@ -4,6 +4,8 @@ import Footer from '../components/Layout/Footer';
 import AnalyticsDashboard from '../components/Features/AnalyticsDashboard';
 import { docuwareService } from '../services/docuwareService';
 
+import { FaChartPie } from 'react-icons/fa';
+
 const AnalyticsPage = () => {
     const [cabinets, setCabinets] = useState([]);
     const [selectedCabinetId, setSelectedCabinetId] = useState(localStorage.getItem('selectedCabinetId') || '');
@@ -42,44 +44,17 @@ const AnalyticsPage = () => {
             <Navbar />
 
             <main className="flex-1 container mx-auto p-4">
-                <h1 className="text-3xl font-bold mb-6">Visual Analytics</h1>
-
-                <div className="card bg-base-100 shadow-xl mb-6">
-                    <div className="card-body">
-                        <div className="form-control w-full max-w-xs">
-                            <label className="label">
-                                <span className="label-text font-bold">Select Cabinet</span>
-                            </label>
-                            {loadingCabinets ? (
-                                <div className="flex items-center gap-2">
-                                    <span className="loading loading-spinner loading-xs"></span>
-                                    <span className="text-sm text-gray-500">Loading cabinets...</span>
-                                </div>
-                            ) : (
-                                <select
-                                    className="select select-bordered"
-                                    value={selectedCabinetId}
-                                    onChange={handleCabinetChange}
-                                >
-                                    <option value="">Selecione o armário</option>
-                                    {cabinets.map((cabinet) => (
-                                        <option key={cabinet.Id} value={cabinet.Id}>
-                                            {cabinet.Name}
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
-                        </div>
-                    </div>
+                <div className="flex items-center gap-3 mb-6">
+                    <FaChartPie className="w-6 h-6 text-primary" />
+                    <h1 className="text-3xl font-bold">Visual Analytics</h1>
                 </div>
 
-                {selectedCabinetId ? (
-                    <AnalyticsDashboard cabinetId={selectedCabinetId} />
-                ) : (
-                    <div className="p-10 text-center text-gray-500">
-                        Please select a cabinet to view analytics.
-                    </div>
-                )}
+                <AnalyticsDashboard
+                    cabinetId={selectedCabinetId}
+                    cabinets={cabinets}
+                    onCabinetChange={handleCabinetChange}
+                    loadingCabinets={loadingCabinets}
+                />
             </main>
 
             <Footer />

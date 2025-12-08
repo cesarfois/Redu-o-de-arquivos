@@ -4,7 +4,7 @@ import { docuwareService } from '../../services/docuwareService';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1', '#a4de6c', '#d0ed57'];
 
-const AnalyticsDashboard = ({ cabinetId }) => {
+const AnalyticsDashboard = ({ cabinetId, cabinets = [], onCabinetChange, loadingCabinets = false }) => {
     const [selectedField, setSelectedField] = useState('');
     const [filterValue, setFilterValue] = useState(''); // New state for secondary filter
     const [availableFields, setAvailableFields] = useState([]);
@@ -237,19 +237,6 @@ const AnalyticsDashboard = ({ cabinetId }) => {
         );
     }
 
-    if (error) {
-        return (
-            <div className="card bg-base-100 shadow-xl mb-4">
-                <div className="card-body flex justify-center items-center h-[100px]">
-                    <div className="text-center">
-                        <p className="text-error font-bold mb-1">Analytics Error</p>
-                        <p className="text-sm text-gray-500">{error}</p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
     if (!fullData || fullData.length === 0) {
         if (cabinetId) {
             return (
@@ -342,14 +329,38 @@ const AnalyticsDashboard = ({ cabinetId }) => {
 
     return (
         <div className="flex flex-col gap-6">
-            {/* Control Bar & Title */}
+            {/* Control Bar */}
             <div className="card bg-base-100 shadow-xl">
                 <div className="card-body">
                     <div className="flex flex-col md:flex-row gap-4 justify-between items-end">
-                        <div>
-                            <h3 className="card-title text-sm mb-2">Dashboard Analytics</h3>
-                            <p className="text-xs text-gray-500">Analysis for cabinet: {cabinetId}</p>
+
+                        {/* Cabinet Selector (Left) */}
+                        <div className="form-control w-full max-w-xs">
+                            <label className="label">
+                                <span className="label-text font-bold">Select Cabinet</span>
+                            </label>
+                            {loadingCabinets ? (
+                                <div className="flex items-center gap-2">
+                                    <span className="loading loading-spinner loading-xs"></span>
+                                    <span className="text-sm text-gray-500">Loading cabinets...</span>
+                                </div>
+                            ) : (
+                                <select
+                                    className="select select-bordered w-full"
+                                    value={cabinetId}
+                                    onChange={onCabinetChange}
+                                >
+                                    <option value="">Selecione o armário</option>
+                                    {cabinets.map((cabinet) => (
+                                        <option key={cabinet.Id} value={cabinet.Id}>
+                                            {cabinet.Name}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
                         </div>
+
+                        {/* Filters (Right) */}
                         <div className="flex gap-4">
                             <div className="form-control w-full max-w-xs">
                                 <label className="label">
@@ -359,6 +370,7 @@ const AnalyticsDashboard = ({ cabinetId }) => {
                                     className="select select-bordered select-sm"
                                     value={selectedField}
                                     onChange={(e) => setSelectedField(e.target.value)}
+                                    disabled={!cabinetId}
                                 >
                                     {availableFields.map(field => (
                                         <option key={field.name} value={field.name}>{field.label}</option>
@@ -374,7 +386,7 @@ const AnalyticsDashboard = ({ cabinetId }) => {
                                     className="select select-bordered select-sm"
                                     value={filterValue}
                                     onChange={(e) => setFilterValue(e.target.value)}
-                                    disabled={!selectedField}
+                                    disabled={!selectedField || !cabinetId}
                                 >
                                     <option value="">All Values</option>
                                     {uniqueValues.map(val => (
