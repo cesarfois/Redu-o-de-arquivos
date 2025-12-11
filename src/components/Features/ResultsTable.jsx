@@ -49,29 +49,64 @@ const ResultsTable = ({ results, totalDocs, cabinetId, renderCustomColumn, initi
             });
         }
 
-        // Sort columns to match initialVisibleColumns order if provided
-        if (initialVisibleColumns && initialVisibleColumns.length > 0) {
-            const orderMap = new Map(initialVisibleColumns.map((name, index) => [name, index]));
+        // SMART DEFAULT SORTING & VISIBILITY
+        // Requirement: ID, Tipo de documento, Estatuto, Data de armazenamento, Tamanho
+
+        const preferredRules = [
+            { key: 'id', match: ['id', 'dwdocid', 'document id'] },
+            { key: 'doctype', match: ['tipo de documento', 'dwdoctype'] },
+            { key: 'docnumber', match: ['número do documento', 'numero do documento', 'document number', 'nº do documento', 'no.', 'n_de_documento', 'nº documento', 'no de documento'] },
+            { key: 'status', match: ['estatuto', 'status', 'state'] },
+            { key: 'date', match: ['dwstoredatetime', 'store date', 'data de armazenamento', 'created at'] },
+            { key: 'size', match: ['dwdisksize', 'filesize', 'size', 'tamanho'] }
+        ];
+
+        // Helper to score columns (0 is best/highest priority)
+        const getMatchScore = (col) => {
+            const name = col.name.toLowerCase();
+            const label = col.label.toLowerCase();
+            return preferredRules.findIndex(rule =>
+                rule.match.some(m => name === m || label === m || label.includes(m))
+            );
+        };
+
+        // 1. Sort Columns
+        if (!initialVisibleColumns || initialVisibleColumns.length === 0) {
             columns.sort((a, b) => {
-                const indexA = orderMap.has(a.name) ? orderMap.get(a.name) : 9999;
-                const indexB = orderMap.has(b.name) ? orderMap.get(b.name) : 9999;
-                return indexA - indexB;
+                const scoreA = getMatchScore(a);
+                const scoreB = getMatchScore(b);
+
+                // If both are preferred, lower index = better priority
+                if (scoreA !== -1 && scoreB !== -1) return scoreA - scoreB;
+                // Preferred comes before non-preferred
+                if (scoreA !== -1) return -1;
+                if (scoreB !== -1) return 1;
+                return 0;
             });
         }
 
         setAllColumns(columns);
 
-        // Set default visible columns
+        // 2. Set Visibility: STRICT MODE
         const defaultVisible = {};
+
         if (initialVisibleColumns && initialVisibleColumns.length > 0) {
-            initialVisibleColumns.forEach(fieldName => {
-                defaultVisible[fieldName] = true;
-            });
+            initialVisibleColumns.forEach(c => defaultVisible[c] = true);
         } else {
-            // Default: show first 6 columns
-            columns.slice(0, 6).forEach(col => {
-                defaultVisible[col.name] = true;
+            // Find trusted matches for the 5 preferred categories
+            preferredRules.forEach(rule => {
+                const match = columns.find(col => {
+                    const name = col.name.toLowerCase();
+                    const label = col.label.toLowerCase();
+                    return rule.match.some(m => name === m || label === m || label.includes(m));
+                });
+                if (match) defaultVisible[match.name] = true;
             });
+
+            // Fallback only if absolutely nothing found
+            if (Object.keys(defaultVisible).length === 0) {
+                columns.slice(0, 6).forEach(c => defaultVisible[c.name] = true);
+            }
         }
 
         setVisibleColumns(defaultVisible);
@@ -660,7 +695,7 @@ const ResultsTable = ({ results, totalDocs, cabinetId, renderCustomColumn, initi
                                         </th>
                                     );
                                 })}
-                                <th className="text-xs">Actions</th>
+                                <th className="text-xs sticky right-0 bg-base-100 z-10 shadow-[-5px_0px_5px_-2px_rgba(0,0,0,0.1)]">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -701,7 +736,7 @@ const ResultsTable = ({ results, totalDocs, cabinetId, renderCustomColumn, initi
                                         {visibleCols.map(col => (
                                             <td key={col.name}>{getFieldValue(doc, col)}</td>
                                         ))}
-                                        <td>
+                                        <td className={`sticky right-0 shadow-[-5px_0px_5px_-2px_rgba(0,0,0,0.1)] ${isSelected ? 'bg-base-200' : 'bg-base-100'}`}>
                                             <div className="flex gap-1">
                                                 <button
                                                     className="btn btn-xs btn-primary"

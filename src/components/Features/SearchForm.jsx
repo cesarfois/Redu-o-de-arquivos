@@ -52,7 +52,12 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
                 }
             }
         } catch (err) {
-            setError('Failed to load cabinets: ' + err.message);
+            console.error('Cabinet fetch error:', err);
+            if (err.message.includes('401') || (err.response && err.response.status === 401)) {
+                setError('Sessão expirada. Por favor, faça logout e entre novamente no sistema.');
+            } else {
+                setError('Failed to load cabinets: ' + err.message);
+            }
             onLog('Error: ' + err.message);
         } finally {
             setLoading(false);
@@ -74,6 +79,23 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
                 .sort((a, b) => (a.DisplayName || a.FieldName).localeCompare(b.DisplayName || b.FieldName));
             setFields(userFields);
             onLog(`Found ${userFields.length} searchable fields`);
+
+            // SMART DEFAULT FILTER: Auto-select "Tipo de documento"
+            const preferredMatch = ['tipo de documento', 'tipo documento'];
+            const defaultField = userFields.find(f => {
+                const label = (f.DisplayName || f.FieldName).toLowerCase();
+                return preferredMatch.some(p => label === p || label.includes(p));
+            });
+
+            if (defaultField) {
+                setFilters(prev => {
+                    // Only set if we have a single empty filter (fresh state)
+                    if (prev.length === 1 && !prev[0].fieldName) {
+                        return [{ fieldName: defaultField.DBFieldName, value: '' }];
+                    }
+                    return prev;
+                });
+            }
         } catch (err) {
             setError('Failed to load fields: ' + err.message);
             onLog('Error: ' + err.message);
@@ -255,7 +277,7 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
                         {selectedCabinet && (
                             <div className="alert alert-info py-1 px-3 shadow-sm inline-flex h-8 min-h-0 items-center">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                <span className="text-xs">Count: <span className="font-bold">{totalCount}</span></span>
+                                <span className="text-xs">Total docs: <span className="font-bold">{totalCount}</span></span>
                             </div>
                         )}
                     </div>
