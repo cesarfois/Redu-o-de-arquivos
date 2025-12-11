@@ -18,7 +18,7 @@ const LoginForm = () => {
         try {
             await login(url, username, password);
         } catch (err) {
-            setError('Login failed. Please check your credentials and URL.');
+            setError(err.message || 'Login failed. Please check your credentials and URL.');
         } finally {
             setLoading(false);
         }

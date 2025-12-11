@@ -93,7 +93,10 @@ export const authService = {
                 const data = error.response.data;
 
                 if (status === 400) {
-                    throw new Error('Invalid credentials. Please check your username and password.');
+                    // Don't mask the error. It could be invalid_grant (bad password) OR invalid_request (bad proxy).
+                    // DocuWare returns { "error": "invalid_grant", "error_description": "..." }
+                    const errorMsg = data.error_description || data.error || 'Invalid credentials or bad request';
+                    throw new Error(`Login Failed (400): ${errorMsg}`);
                 } else if (status === 401) {
                     throw new Error('Unauthorized. Please verify your credentials.');
                 } else if (status === 404) {
