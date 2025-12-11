@@ -14,16 +14,32 @@ const api = axios.create({
 api.interceptors.request.use(
     (config) => {
         const authData = sessionStorage.getItem('docuware_auth');
+        let targetUrl = null;
+
         if (authData) {
             try {
                 const parsed = JSON.parse(authData);
                 if (parsed.token) {
                     config.headers.Authorization = `Bearer ${parsed.token}`;
                 }
+                if (parsed.url) {
+                    targetUrl = parsed.url;
+                }
             } catch (error) {
                 console.error('Error parsing auth data:', error);
             }
         }
+
+        // Allow overriding target URL via config (useful for login/discovery)
+        if (config.headers['x-target-url']) {
+            targetUrl = config.headers['x-target-url'];
+        }
+
+        // Apply header if we have a target
+        if (targetUrl) {
+            config.headers['x-target-url'] = targetUrl;
+        }
+
         return config;
     },
     (error) => {

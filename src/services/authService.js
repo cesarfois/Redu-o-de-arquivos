@@ -21,12 +21,16 @@ export const authService = {
 
             // Step 1: Get Identity Service URL
             console.log('Step 1: Getting Identity Service Info...');
-            const serviceDesc = await api.get('/Home/IdentityServiceInfo');
+            // Pass the target URL in the header so the proxy knows where to go
+            const serviceDesc = await api.get('/Home/IdentityServiceInfo', {
+                headers: { 'x-target-url': baseUrl }
+            });
             const identityUrl = serviceDesc.data.IdentityServiceUrl;
             console.log('Identity Service URL:', identityUrl);
 
             // Extract only the path part of the Identity URL (e.g. /bcb... )
             const identityPath = new URL(identityUrl).pathname;
+            const identityOrigin = new URL(identityUrl).origin; // We need the origin for the proxy target
 
             // Extract organization ID from the identity URL path
             // Format: /bcb91903-58eb-49c6-8572-be5e3bb9611e
@@ -36,12 +40,16 @@ export const authService = {
             // Step 2: Get Token Endpoint from OpenID Configuration (via proxy to avoid CORS)
             console.log('Step 2: Getting OpenID Configuration...');
             const proxiedIdentity = `/docuware-proxy${identityPath}`;
-            const discovery = await axios.get(`${proxiedIdentity}/.well-known/openid-configuration`);
+            // Identity service might be on a different subdomain, so we pass its origin as target
+            const discovery = await axios.get(`${proxiedIdentity}/.well-known/openid-configuration`, {
+                headers: { 'x-target-url': identityOrigin }
+            });
             const tokenEndpoint = discovery.data.token_endpoint;
             console.log('Token Endpoint:', tokenEndpoint);
 
             // Extract only the path part of the Token Endpoint URL
             const tokenPath = new URL(tokenEndpoint).pathname;
+            const tokenOrigin = new URL(tokenEndpoint).origin;
 
             // Step 3: Request Access Token (also via proxy)
             console.log('Step 3: Requesting Access Token...');
@@ -54,7 +62,10 @@ export const authService = {
             params.append('scope', 'docuware.platform');
 
             const tokenResponse = await axios.post(proxiedToken, params, {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'x-target-url': tokenOrigin
+                }
             });
 
             const accessToken = tokenResponse.data.access_token;

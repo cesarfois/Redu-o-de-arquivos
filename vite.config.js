@@ -4,19 +4,19 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: true,
     proxy: {
       // Proxy for DocuWare Platform API
       '/DocuWare': {
-        target: 'https://rcsangola.docuware.cloud',
+        target: 'http://localhost:3001', // Forward to local dynamic proxy
         changeOrigin: true,
-        secure: true,
+        secure: false,
       },
       // Proxy for Identity Service (login)
       '/docuware-proxy': {
-        target: 'https://login-emea.docuware.cloud',
+        target: 'http://localhost:3001', // Forward to local dynamic proxy
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/docuware-proxy/, ''),
-        secure: true,
+        secure: false,
       },
     },
   },

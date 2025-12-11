@@ -5,7 +5,7 @@ import ErrorMessage from '../Common/ErrorMessage';
 
 const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
     const [cabinets, setCabinets] = useState([]);
-    const [selectedCabinet, setSelectedCabinet] = useState(localStorage.getItem('selectedCabinetId') || '');
+    const [selectedCabinet, setSelectedCabinet] = useState(''); // Start empty, validate localStorage later
     const [fields, setFields] = useState([]);
     const [allFields, setAllFields] = useState([]); // Store all raw fields
     const [suggestions, setSuggestions] = useState({}); // { [index]: [values] }
@@ -15,15 +15,18 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
 
     useEffect(() => {
         fetchCabinets();
-        // Notify parent if we have a stored cabinet
-        if (selectedCabinet && onCabinetChange) {
-            onCabinetChange(selectedCabinet);
-        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
         if (selectedCabinet) {
             fetchFields();
+            // Notify parent if we have a stored cabinet
+            if (onCabinetChange) {
+                // Find name if possible
+                const cabinet = cabinets.find(c => c.Id === selectedCabinet);
+                if (cabinet) onCabinetChange(selectedCabinet, cabinet.Name);
+            }
         }
     }, [selectedCabinet]);
 
@@ -35,6 +38,19 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
             const sortedData = data.sort((a, b) => a.Name.localeCompare(b.Name));
             setCabinets(sortedData);
             onLog(`Found ${data.length} file cabinets`);
+
+            // Validate and restore selection from localStorage
+            const storedId = localStorage.getItem('selectedCabinetId');
+            if (storedId) {
+                const isValid = sortedData.some(c => c.Id === storedId);
+                if (isValid) {
+                    console.log(`Restoring valid cabinet selection: ${storedId}`);
+                    setSelectedCabinet(storedId);
+                } else {
+                    console.warn(`Stored cabinet ID ${storedId} not found. Clearing.`);
+                    localStorage.removeItem('selectedCabinetId');
+                }
+            }
         } catch (err) {
             setError('Failed to load cabinets: ' + err.message);
             onLog('Error: ' + err.message);

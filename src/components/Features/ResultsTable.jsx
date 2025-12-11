@@ -5,7 +5,7 @@ import StatusConfig from './StatusConfig';
 import ColumnFilter from './ColumnFilter';
 import ColumnSelector from './ColumnSelector';
 
-const ResultsTable = ({ results, totalDocs, cabinetId, renderCustomColumn, initialVisibleColumns, getCustomStatusValue }) => {
+const ResultsTable = ({ results, totalDocs, cabinetId, renderCustomColumn, initialVisibleColumns, getCustomStatusValue, selectable = false, selectedIds = [], onSelectionChange }) => {
     const [visibleColumns, setVisibleColumns] = useState({});
     const [allColumns, setAllColumns] = useState([]);
     const [statusConfig, setStatusConfig] = useState(null);
@@ -493,6 +493,35 @@ const ResultsTable = ({ results, totalDocs, cabinetId, renderCustomColumn, initi
         setAllColumns(newAllColumns);
     };
 
+    // Selection Handlers (New)
+    const handleSelectAll = (e) => {
+        if (!onSelectionChange) return;
+
+        if (e.target.checked) {
+            // Select all items on current page
+            const newSelected = [...new Set([...selectedIds, ...paginatedResults.map(r => r.Id)])];
+            onSelectionChange(newSelected);
+        } else {
+            // Deselect all items on current page
+            const pageIds = paginatedResults.map(r => r.Id);
+            const newSelected = selectedIds.filter(id => !pageIds.includes(id));
+            onSelectionChange(newSelected);
+        }
+    };
+
+    const handleSelectRow = (id) => {
+        if (!onSelectionChange) return;
+
+        if (selectedIds.includes(id)) {
+            onSelectionChange(selectedIds.filter(sid => sid !== id));
+        } else {
+            onSelectionChange([...selectedIds, id]);
+        }
+    };
+
+    const allPageSelected = paginatedResults.length > 0 && paginatedResults.every(r => selectedIds.includes(r.Id));
+    const somePageSelected = paginatedResults.some(r => selectedIds.includes(r.Id));
+
     return (
         <div className="card bg-base-100 shadow-xl">
             <div className="card-body">
@@ -548,6 +577,21 @@ const ResultsTable = ({ results, totalDocs, cabinetId, renderCustomColumn, initi
                     <table className="table table-zebra table-sm">
                         <thead>
                             <tr>
+                                {selectable && (
+                                    <th className="w-10">
+                                        <label>
+                                            <input
+                                                type="checkbox"
+                                                className="checkbox checkbox-sm checkbox-primary"
+                                                checked={allPageSelected}
+                                                ref={input => {
+                                                    if (input) input.indeterminate = somePageSelected && !allPageSelected;
+                                                }}
+                                                onChange={handleSelectAll}
+                                            />
+                                        </label>
+                                    </th>
+                                )}
                                 {renderCustomColumn && (
                                     <th className="text-xs">
                                         <div className="flex items-center gap-1">
@@ -622,8 +666,21 @@ const ResultsTable = ({ results, totalDocs, cabinetId, renderCustomColumn, initi
                         <tbody>
                             {paginatedResults.map((doc, idx) => {
                                 const statusColor = getStatusColor(doc);
+                                const isSelected = selectedIds.includes(doc.Id);
                                 return (
-                                    <tr key={doc.Id || idx}>
+                                    <tr key={doc.Id || idx} className={isSelected ? "bg-base-200" : ""}>
+                                        {selectable && (
+                                            <td>
+                                                <label>
+                                                    <input
+                                                        type="checkbox"
+                                                        className="checkbox checkbox-sm checkbox-primary"
+                                                        checked={isSelected}
+                                                        onChange={() => handleSelectRow(doc.Id)}
+                                                    />
+                                                </label>
+                                            </td>
+                                        )}
                                         {renderCustomColumn && (
                                             <td>
                                                 <div className="flex justify-center">
@@ -753,7 +810,7 @@ const ResultsTable = ({ results, totalDocs, cabinetId, renderCustomColumn, initi
                     </div>
                 )}
             </div>
-        </div >
+        </div>
     );
 };
 

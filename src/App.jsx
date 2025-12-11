@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SemaforosPage from './pages/SemaforosPage';
+import DownloadPage from './pages/DownloadPage';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -45,6 +46,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SemaforosPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/download"
+            element={
+              <ProtectedRoute>
+                <DownloadPage />
               </ProtectedRoute>
             }
           />

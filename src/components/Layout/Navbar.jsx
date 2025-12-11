@@ -24,6 +24,12 @@ const Navbar = () => {
                         >
                             Analytics
                         </Link>
+                        <Link
+                            to="/download"
+                            className={`btn btn-sm ${location.pathname === '/download' ? 'btn-primary' : 'btn-ghost'}`}
+                        >
+                            Baixar Arquivos
+                        </Link>
                         {(!localStorage.getItem(`docuware_control_visible_${user.username}`) || localStorage.getItem(`docuware_control_visible_${user.username}`) !== 'false') && (
                             <Link
                                 to="/semaforos"
