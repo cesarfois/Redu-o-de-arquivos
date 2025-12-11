@@ -73,7 +73,7 @@ const DashboardPage = () => {
                         <FaSearch className="w-6 h-6 text-primary" />
                         <h1 className="text-3xl font-bold">Pesquisa de Documentos</h1>
                     </div>
-                    <div className="w-full md:w-1/2 lg:w-2/5">
+                    <div className="w-full md:w-1/2 lg:w-2/5 self-end h-14">
                         <LogConsole logs={logs} />
                     </div>
                 </div>

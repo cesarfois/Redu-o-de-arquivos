@@ -115,19 +115,19 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
     if (loading) return <LoadingSpinner />;
 
     return (
-        <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
+        <div className="card bg-base-100 shadow-md">
+            <div className="card-body p-4">
 
 
                 {error && <ErrorMessage message={error} />}
 
                 {/* Cabinet Selection */}
-                <div className="form-control">
-                    <label className="label">
-                        <span className="label-text">File Cabinet</span>
+                <div className="form-control mb-2">
+                    <label className="label py-1">
+                        <span className="label-text font-medium text-xs">File Cabinet</span>
                     </label>
                     <select
-                        className="select select-bordered w-full"
+                        className="select select-bordered select-sm w-full"
                         value={selectedCabinet}
                         onChange={(e) => {
                             const newValue = e.target.value;
@@ -158,13 +158,13 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
 
                 {/* Filters */}
                 {selectedCabinet && fields.length > 0 && (
-                    <div className="mt-4">
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="label">
-                                <span className="label-text font-semibold">Filters</span>
+                    <div className="mt-2">
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="label py-0">
+                                <span className="label-text font-semibold text-xs">Filters</span>
                             </label>
                             <button
-                                className="btn btn-sm btn-outline"
+                                className="btn btn-xs btn-outline"
                                 onClick={handleAddFilter}
                             >
                                 + Add Filter
@@ -174,7 +174,7 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
                         {filters.map((filter, index) => (
                             <div key={index} className="flex gap-2 mb-2">
                                 <select
-                                    className="select select-bordered flex-1"
+                                    className="select select-bordered select-sm flex-1 text-xs"
                                     value={filter.fieldName}
                                     onChange={async (e) => {
                                         const fieldName = e.target.value;
@@ -213,7 +213,7 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
                                     <input
                                         type="text"
                                         list={`suggestions-${index}`}
-                                        className="input input-bordered w-full"
+                                        className="input input-bordered input-sm w-full text-xs"
                                         placeholder="Value..."
                                         value={filter.value}
                                         onFocus={async () => {
@@ -237,7 +237,7 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
 
                                 {filters.length > 1 && (
                                     <button
-                                        className="btn btn-error btn-outline"
+                                        className="btn btn-error btn-outline btn-xs"
                                         onClick={() => handleRemoveFilter(index)}
                                     >
                                         ✕
@@ -249,24 +249,24 @@ const SearchForm = ({ onSearch, onLog, totalCount = 0, onCabinetChange }) => {
                 )}
 
                 {/* Bottom Row: Total Count (Left) & Search Button (Right) */}
-                <div className="flex justify-between items-end mt-6">
+                <div className="flex justify-between items-end mt-2">
                     {/* Total Count Display - Moved here */}
                     <div>
                         {selectedCabinet && (
-                            <div className="alert alert-info py-2 shadow-sm inline-flex">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                <span>Total Documents in Cabinet: <span className="font-bold">{totalCount}</span></span>
+                            <div className="alert alert-info py-1 px-3 shadow-sm inline-flex h-8 min-h-0 items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <span className="text-xs">Count: <span className="font-bold">{totalCount}</span></span>
                             </div>
                         )}
                     </div>
 
                     {/* Search Button */}
                     <button
-                        className="btn btn-primary"
+                        className="btn btn-primary btn-sm"
                         onClick={handleSearch}
                         disabled={!selectedCabinet}
                     >
-                        Search Documents
+                        Search
                     </button>
                 </div>
             </div>

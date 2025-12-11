@@ -454,7 +454,7 @@ const DownloadPage = () => {
                     </div>
 
                     {/* Right Column: Logs */}
-                    <div className="h-full min-h-[300px]">
+                    <div className="h-full max-h-[220px]">
                         <LogConsole logs={logs} />
                     </div>
                 </div>

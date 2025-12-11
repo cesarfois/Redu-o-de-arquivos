@@ -8,11 +8,12 @@ const LogConsole = ({ logs, className = "" }) => {
     }, [logs]);
 
     return (
-        <div className={`mockup-code bg-black text-green-400 h-full overflow-y-auto text-[10px] py-1 leading-tight ${className}`}>
+        <div className={`bg-black text-green-400 font-mono rounded-lg p-4 h-full overflow-y-auto text-[10px] py-2 leading-tight ${className}`}>
             {logs.map((log, index) => (
-                <pre key={index} data-prefix=">">
-                    <code>{log}</code>
-                </pre>
+                <div key={index} className="whitespace-pre-wrap">
+                    <span className="opacity-50 mr-2">&gt;</span>
+                    {log}
+                </div>
             ))}
             <div ref={endRef} />
         </div>
