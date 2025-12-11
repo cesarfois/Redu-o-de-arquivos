@@ -552,13 +552,13 @@ const DownloadPage = () => {
                         </div>
 
                         {/* Metadata Update Options */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-3 bg-base-200 rounded-lg">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 p-2 bg-base-200 rounded-lg">
                             <div className="form-control w-full">
-                                <label className="label">
-                                    <span className="label-text">Atualizar Campo (Opcional):</span>
+                                <label className="label py-1">
+                                    <span className="label-text text-xs font-medium">Atualizar Campo (Opcional):</span>
                                 </label>
                                 <select
-                                    className="select select-bordered w-full"
+                                    className="select select-bordered select-sm w-full text-xs"
                                     value={updateField}
                                     onChange={(e) => setUpdateField(e.target.value)}
                                     disabled={isMonitoring}
@@ -573,13 +573,13 @@ const DownloadPage = () => {
                             </div>
 
                             <div className="form-control w-full">
-                                <label className="label">
-                                    <span className="label-text">Valor a Gravar:</span>
+                                <label className="label py-1">
+                                    <span className="label-text text-xs font-medium">Valor a Gravar:</span>
                                 </label>
                                 <input
                                     type="text"
                                     placeholder="Ex: PROCESSADO"
-                                    className="input input-bordered w-full"
+                                    className="input input-bordered input-sm w-full text-xs"
                                     value={updateValue}
                                     onChange={(e) => setUpdateValue(e.target.value)}
                                     disabled={!updateField || isMonitoring}
