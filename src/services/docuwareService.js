@@ -254,6 +254,10 @@ export const docuwareService = {
         const response = await api.get(
             `/FileCabinets/${cabinetId}/Documents/${documentId}/FileDownload`,
             {
+                params: {
+                    targetFileType: 'pdf',
+                    keepAnnotations: true // Ensure annotations like stamps are included
+                },
                 responseType: 'blob',
                 timeout: 120000 // 2 minutes timeout for downloads
             }
