@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FaTrafficLight } from 'react-icons/fa';
 import Navbar from '../components/Layout/Navbar';
 import Footer from '../components/Layout/Footer';
-import SearchForm from '../components/Features/SearchForm';
+import TrafficLightConfigForm from '../components/Features/TrafficLightConfigForm';
 import ResultsTable from '../components/Features/ResultsTable';
 import StatusConfig from '../components/Features/StatusConfig';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +40,21 @@ const ControlCreator = ({ onCancel, onSave, user, initialData }) => {
 
     const handleCabinetChange = (cabinetId, cabinetName) => {
         setConfig({ ...config, cabinetId, cabinetName });
+    };
+
+    const [previewCount, setPreviewCount] = useState(0);
+
+    const handlePreviewCount = async (cabinetId, filterList) => {
+        try {
+            // Check if we have valid filters first
+            if (!cabinetId || filterList.length === 0) return;
+
+            const response = await docuwareService.searchDocuments(cabinetId, filterList);
+            // Just update the count for UI feedback
+            setPreviewCount(response.total);
+        } catch (error) {
+            console.error("Preview count failed", error);
+        }
     };
 
     const handleSearch = async (cabinetId, filters, availableFieldsFromSearch) => {
@@ -167,21 +182,22 @@ const ControlCreator = ({ onCancel, onSave, user, initialData }) => {
     return (
         <div className="card bg-base-100 shadow-xl border border-base-200 max-w-5xl mx-auto">
             <div className="card-body p-6">
-                <h2 className="card-title text-2xl mb-2">
-                    {step === 1 ? 'Passo 1: Definir Filtros' : 'Passo 2: Seleção de Colunas e Status'}
-                </h2>
+                {step === 2 && (
+                    <h2 className="card-title text-2xl mb-2">
+                        Passo 2: Seleção de Colunas e Status
+                    </h2>
+                )}
 
                 {step === 1 && (
                     <>
-                        <p className="text-gray-500 mb-2 text-sm">Escolha o armário e configure os filtros padrão.</p>
                         <div className="bg-base-50 rounded-lg p-2 border border-base-200">
-                            <SearchForm
+                            <TrafficLightConfigForm
                                 onSearch={handleSearch}
+                                onPreview={handlePreviewCount}
                                 onLog={() => { }}
-                                totalCount={0}
+                                totalCount={previewCount}
                                 onCabinetChange={handleCabinetChange}
                                 initialCabinetId={config.cabinetId}
-                                submitLabel={loadingFields ? "Carregando..." : "Próximo: Colunas"}
                             />
                         </div>
                         <div className="mt-2 text-right">

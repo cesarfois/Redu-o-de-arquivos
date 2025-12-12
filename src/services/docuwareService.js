@@ -265,80 +265,22 @@ export const docuwareService = {
         return response.data;
     },
 
-    // 7. Replace Document Content (Round-Trip)
+    // 7. Replace Document Content (Full Overwrite Strategy)
     uploadReplacement: async (cabinetId, documentId, fileBlob) => {
-        console.log(`[uploadReplacement] Fetching doc ${documentId} from cabinet ${cabinetId}`);
+        console.log(`[uploadReplacement] Starting overwrite for doc ${documentId} in cabinet ${cabinetId}`);
 
-        // 1. Get the document to find the HATEOAS links
-        const docResponse = await api.get(`/FileCabinets/${cabinetId}/Documents/${documentId}`);
-        const doc = docResponse.data;
+        try {
+            // Step 1: Fetch the current document state to identify ALL existing sections
+            const docResponse = await api.get(`/FileCabinets/${cabinetId}/Documents/${documentId}`);
+            const originalDoc = docResponse.data;
+            const originalSections = originalDoc.Sections || [];
 
-        console.log('[uploadReplacement] Document fetched:', doc);
+            console.log(`[uploadReplacement] Found ${originalSections.length} existing sections to replace.`);
 
-        if (!doc.Sections || doc.Sections.length === 0) {
-            throw new Error("Document has no sections to replace.");
-        }
-
-        // Use the ID of the first section
-        const section = doc.Sections[0];
-        console.log('[uploadReplacement] Target Section:', section);
-
-        // Find the 'content' link or 'simpleContent' link
-        // DocuWare HATEOAS is the source of truth
-        let uploadLink = null;
-        if (section.Links) {
-            uploadLink = section.Links.find(l => l.Relation === 'content' || l.Relation === 'simpleContent');
-        }
-
-        if (!uploadLink) {
-            console.warn('[uploadReplacement] "content" link missing. Will use fallback strategy.');
-        }
-
-        if (uploadLink) {
-            console.log('[uploadReplacement] Found HATEOAS link:', uploadLink.Href);
-            // The Link.Href is usually a full absolute URL (e.g. https://.../DocuWare/Platform/...)
-            // Our axios 'api' is configured with baseURL '/DocuWare/Platform'.
-            // We need to make this relative to that baseURL to avoid double-prefixing if axios handles it,
-            // OR construct a clean relative path.
-
-            // Strategy: Extract everything after '/Platform/'
-            // Sample: https://domain/DocuWare/Platform/FileCabinets/123/Sections/456/Content
-            const token = '/Platform/';
-            const idx = uploadLink.Href.indexOf(token);
-            let uploadUrl;
-            if (idx !== -1) {
-                uploadUrl = uploadLink.Href.substring(idx + token.length);
-            } else {
-                console.warn('[uploadReplacement] Could not parse relative path from HREF. Using manual construction.');
-                uploadUrl = `/FileCabinets/${cabinetId}/Sections/${section.Id}/Content`;
-            }
-
-            console.log(`[uploadReplacement] Final Upload URL (relative): ${uploadUrl}`);
-
-            // 2. Upload to the correct endpoint
-            const response = await api.put(
-                uploadUrl,
-                fileBlob,
-                {
-                    headers: {
-                        'Content-Type': fileBlob.type || 'application/pdf',
-                        'Content-Disposition': `inline; filename="${fileBlob.name || 'document.pdf'}"`
-                    },
-                    timeout: 120000 // 2 minutes timeout for upload
-                }
-            );
-            return response.data;
-
-        } else {
-            console.warn('[uploadReplacement] "content" link missing. Attempting Fallback: Append New + Delete Old.');
-
-            // Fallback Strategy:
-            // 1. Append the new file as a NEW section.
-            // 2. Delete the OLD section.
-
-            // Step A: Append
+            // Step 2: Append the NEW file as a fresh section
+            // We use POST to /Sections to append.
             const appendUrl = `/FileCabinets/${cabinetId}/Sections?docId=${documentId}`;
-            console.log(`[uploadReplacement] Fallback Append URL: ${appendUrl}`);
+            console.log(`[uploadReplacement] Appending new file via: ${appendUrl}`);
 
             await api.post(
                 appendUrl,
@@ -346,41 +288,44 @@ export const docuwareService = {
                 {
                     headers: {
                         'Content-Type': fileBlob.type || 'application/pdf',
-                        'Content-Disposition': `inline; filename="${fileBlob.name || 'document.pdf'}"`
+                        'Content-Disposition': `inline; filename="${fileBlob.name || 'reduced_document.pdf'}"`
                     },
-                    timeout: 120000
+                    timeout: 120000 // 2 min timeout
                 }
             );
-            console.log('[uploadReplacement] Fallback Append Successful. Re-fetching document state...');
+            console.log('[uploadReplacement] New file appended successfully.');
 
-            // Step A.5: Verify State
-            const refreshResponse = await api.get(`/FileCabinets/${cabinetId}/Documents/${documentId}`);
-            const refreshedDoc = refreshResponse.data;
-            console.log('[uploadReplacement] Refreshed Sections:', JSON.stringify(refreshedDoc.Sections, null, 2));
+            // Step 3: Delete ALL original sections
+            // We must be careful not to delete the new section we just added.
+            // Since we captured 'originalSections' BEFORE the append, we are safe to delete exactly those IDs.
 
-            const oldSectionStillExists = refreshedDoc.Sections.find(s => s.Id === section.Id);
-            if (!oldSectionStillExists) {
-                console.log('[uploadReplacement] Old section is gone! Implicit replacement occurred.');
-                return refreshedDoc;
-            }
+            if (originalSections.length > 0) {
+                console.log('[uploadReplacement] Deleting old sections...');
 
-            // Step B: Delete Old Section
-            const deleteUrl = `/FileCabinets/${cabinetId}/Sections/${section.Id}`;
-            console.log(`[uploadReplacement] Fallback Delete Old Section: ${deleteUrl}`);
+                // Process deletions sequentially to avoid race conditions or overload
+                for (const section of originalSections) {
+                    const deleteUrl = `/FileCabinets/${cabinetId}/Sections/${section.Id}`;
+                    console.log(`[uploadReplacement] Deleting old section: ${section.Id}`);
 
-            try {
-                const deleteResponse = await api.delete(deleteUrl);
-                console.log('[uploadReplacement] Fallback Delete Successful.');
-                return deleteResponse.data;
-            } catch (deleteErr) {
-                console.error('[uploadReplacement] Fallback Delete Failed:', deleteErr);
-                // If 404, maybe it's already gone?
-                if (deleteErr.response && deleteErr.response.status === 404) {
-                    console.warn('[uploadReplacement] Delete returned 404. Assuming section was removed or inaccessible.');
-                    return refreshedDoc;
+                    try {
+                        await api.delete(deleteUrl);
+                    } catch (delErr) {
+                        console.error(`[uploadReplacement] Failed to delete section ${section.Id}`, delErr);
+                        // We continue even if one fails, to try to clean up as much as possible
+                    }
                 }
-                throw deleteErr; // Rethrow other errors
+                console.log('[uploadReplacement] All old sections deleted.');
+            } else {
+                console.log('[uploadReplacement] No old sections found (strange for a replacement, but proceeding).');
             }
+
+            // Step 4: Return final state
+            const finalDocResponse = await api.get(`/FileCabinets/${cabinetId}/Documents/${documentId}`);
+            return finalDocResponse.data;
+
+        } catch (error) {
+            console.error('[uploadReplacement] Critical Error during overwrite:', error);
+            throw error;
         }
     },
 
