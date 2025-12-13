@@ -229,7 +229,10 @@ const DownloadPage = () => {
             }
             try {
                 const fields = await docuwareService.getCabinetFields(cabinetId);
-                // Filter only string/text fields if possible, but showing all for flexibility
+                // Sort fields alphabetically by DisplayName or Name
+                if (fields) {
+                    fields.sort((a, b) => (a.DisplayName || a.Name).localeCompare(b.DisplayName || b.Name));
+                }
                 setAvailableFields(fields || []);
             } catch (err) {
                 console.error("Failed to fetch fields for cabinet:", err);
@@ -257,7 +260,7 @@ const DownloadPage = () => {
         setIsMonitoring(true);
         setMonitorStats({ success: 0, error: 0 }); // Reset stats
         addLog(`👀 Starting monitoring of folder: ${monitorFolderName}...`);
-        addLog(`⏳ Will auto-stop if no files found for 60 seconds.`);
+        addLog(`⏳ Will auto-stop if no files found for 5 minutes.`);
 
         // Clear previous failure history & Reset activity timer
         failedUploads.current = {};
@@ -407,8 +410,8 @@ const DownloadPage = () => {
                 lastActivityRef.current = Date.now(); // Reset timer if we did work
             } else {
                 const idleTime = Date.now() - lastActivityRef.current;
-                if (idleTime > 60000) { // 60 seconds
-                    addLog('💤 No files found for 1 minute. Finishing job automatically.');
+                if (idleTime > 300000) { // 5 minutes (300,000 ms)
+                    addLog('💤 No files found for 5 minutes. Finishing job automatically.');
                     // Don't call stopMonitoring directly here to avoid state closure issues with alert,
                     // but we can just trigger it. The stats state will be whatever it is.
                     stopMonitoring();
@@ -587,9 +590,7 @@ const DownloadPage = () => {
                             </div>
                         </div>
 
-                        <p className="text-xs text-gray-500 mt-2">
-                            Monitore uma pasta local. Arquivos processados (com nome ID___CABINET___NOME.pdf) serão enviados automaticamente para o DocuWare, substituindo o original.
-                        </p>
+
                     </div>
                 </div>
 
